@@ -1,0 +1,118 @@
+#!/bin/bash
+#exit codes
+_EXITCODE=-1
+#prints uasage
+BADCMD=3 
+BADARGCNT=5
+BADINPUT=7
+
+NUMARGS=$#
+SUBCMD=$1
+_RET=""
+
+# checks that SUBCMD is one of the five implemented functions
+usage() 
+{
+  if [ $DEBUG ]
+  then
+    echo -e "In usage()..."
+    echo -e "\tSUBCMD is $SUBCMD"
+  fi
+  case $SUBCMD in 
+    dims|transpose|mean|add|multiply) return 0;;
+    *) _EXITCODE=$BADCMD && quit;;
+  esac
+}
+
+# checks the number of arguments after a subcommand (dims, transpose, etc.)
+# in: the number of arguments to check for ($1)
+chk_arg_count()
+{
+  if [ $DEBUG ]
+  then
+    echo -e "In chk_arg_count()..."
+  fi
+  local subargs=$(expr $NUMARGS - 1)
+  if [ $subargs -ne $1 ]
+  then
+    _EXITCODE=$BADARGCNT
+    quit
+  fi
+  return 0   
+}
+
+# checks for valid file or stdin input; assumed that this is called after chk_arg_count and 
+# ...at least one arg is present
+chk_input() {
+  # if we're getting input from stdin and the second parameter is null, okay 
+  if [[ -t 0 && -n $2 ]] 
+  then
+    return 0
+  # however, if both stdin and a second (presumably file) parameter are given, bad
+  elif [[ -t 0 && "$2" ]]
+  then 
+    _EXITCODE=$BADINPUT
+    quit
+  # if nothing's on stdin and a second (presumably file) parameter is readable, good
+  elif [[ -t 1 && -r $2 ]]
+  then
+    return 0 
+  # if nothing's on stdin and a second (presumably file) parameter is not readable, bad
+  elif [[ -t 1 && -r $2 ]]
+  then
+    _EXITCODE=$BADINPUT
+    quit
+  fi
+}
+
+quit() 
+{
+  if [ $DEBUG ]
+  then
+    echo -e "In quit()..."
+    echo -e "\t _EXITCODE is $_EXITCODE"
+  fi
+  
+  case $_EXITCODE in 
+    "$BADCMD") echo -e "Usage: \tmatrix dims [MATRIX]\n\tmatrix transpose [MATRIX]"\
+      "\n\tmatrix mean [MATRIX]\n\tmatrix add MATRIX1 MATRIX2"\
+      "\n\tmatrix multiply MATRIX1 MATRIX2\n" >&2;;
+    "$BADARGCNT") echo 'Error: Number of arguments to subcommand invalid' >&2;;
+    "$BADINPUT") echo "Error: File input not readable or too many inputs provided (stdin and file)\n";;
+  esac
+  exit $_EXITCODE
+}
+
+dims() {
+  echo -e "In dims\n"
+}
+
+transpose() {
+  echo nuts
+}
+
+mean() {
+  echo nop
+}
+
+add() {
+  echo nop
+}
+
+multiply() {
+  echo nop
+}
+
+usage 
+if [ "$SUBCMD" = "dims" ]
+then
+  #dims only takes one argument
+  if chk_arg_count 1;
+  then
+    if chk_input $2;
+    then
+      dims "${@:2}"
+    fi
+  fi
+fi
+
