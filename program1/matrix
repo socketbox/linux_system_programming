@@ -43,36 +43,45 @@ chk_arg_count()
     echo "This is arg to func: $1"
   fi
   local subargs=$(expr $NUMARGS - 1)
-  #if number of args is less than one, chk stdin
-  if [[ ($subargs -lt 1) && ($SUBCMD = "dims" || $SUBCMD = 'add' || $SUBCMD = 'transpose') ]]
-  then
-    if [ "$DEBUG" ]
-    then
-      echo "Checking for stdin"
-    fi
-    #test for stdin
-    cat > "$INFILE"
-    if [ ! -r "$INFILE" ]
-    then
-      _EXITCODE="$BADARGCNT"
-      quit
-    elif [ "$DEBUG" ]
-    then
-      echo "New file from stdin is readable."
-    fi
-  #if args == 1, then check for incorrect subcmd
-  elif [[ ($subargs -eq 1) && ($SUBCMD = 'add' || $SUBCMD = 'multiply') ]]
-  then
-    _EXITCODE=$BADARGCNT
-    quit
-  #if args > 1, and subcmd takes only one arg, indicate that the second will be ignored
-  elif [[ ( $subargs -gt 1 ) && ( $SUBCMD = 'dims' || $SUBCMD = 'add' || $SUBCMD = 'transpose' ) ]]
-  then
-      _EXITCODE=$BADARGCNT
-      quit
-  fi
-  # default is to assign the first file argument to input var
-	define INFILE="$1"
+	if [ "$DEBUG" ]
+	then
+		echo "subargs: $subargs"
+	fi
+	#if number of args is less than one, chk stdin
+	if [[ ($subargs -lt 1) && ($SUBCMD = "dims" || $SUBCMD = 'mean' || $SUBCMD = 'transpose') ]]
+	then
+		if [ "$DEBUG" ]
+		then
+			echo "Checking for stdin"
+		fi
+		#read from stdin
+		cat > "$INFILE"
+		if [ ! -r "$INFILE" ]
+		then
+			_EXITCODE="$BADARGCNT"
+			quit
+		elif [ "$DEBUG" ]
+		then
+			echo "New file from stdin is readable."
+		fi
+		#if args == 1, then check for incorrect subcmd
+	elif [[ ($subargs -eq 1) && ($SUBCMD = "dims" || $SUBCMD = 'mean' || $SUBCMD = 'transpose') ]]   
+	then
+		INFILE="$1"
+	elif 	[[ ($subargs -eq 1) && ($SUBCMD = "add" || $SUBCMD = 'multiply') ]]   
+	then
+		_EXITCODE=$BADARGCNT
+		quit
+		#if args > 1, and subcmd takes only one arg, indicate that the second will be ignored
+	elif [[ ( $subargs -gt 1 ) && ( $SUBCMD = 'dims' || $SUBCMD = 'mean' || $SUBCMD = 'transpose' ) ]]
+	then
+		_EXITCODE=$BADARGCNT
+		quit
+	elif [[ "$subargs" -gt 2 ]]
+	then
+		_EXITCODE=$BADARGCNT
+		quit
+	fi
 	_RET=0   
 }
 
