@@ -1,13 +1,17 @@
 #!/bin/bash
+trap "rm -f tmpfile$$ infile$$; echo 'SIGINT received: Deleting temp file then exiting!'; exit 1" INT
 #exit codes
 _EXITCODE=-1
 #prints uasage
 BADCMD=3 
 BADARGCNT=5
 BADINPUT=7
+BADFILEINPUT=9
 
 NUMARGS=$#
 SUBCMD=$1
+SUBCMDARGCNT=0
+INFILE="infile$$"
 _RET=""
 
 # checks that SUBCMD is one of the five implemented functions
@@ -24,43 +28,100 @@ usage()
   esac
 }
 
-# checks the number of arguments after a subcommand (dims, transpose, etc.)
-# in: the number of arguments to check for ($1)
+# checks the number of arguments after a subcommand (dims, transpose, etc.) and cats stdin to a
+# tmp file if possible
+# in :expects that first and second args to function are the second and third args to the script
+# out: INFILE is set to a valid file
 chk_arg_count()
 {
   if [ $DEBUG ]
   then
     echo -e "In chk_arg_count()..."
+    echo \$1 "$1"
   fi
   local subargs=$(expr $NUMARGS - 1)
-  if [ $subargs -ne $1 ]
+  #if number of args is less than one, chk stdin
+  if [[ ($subargs -lt 1) && ($SUBCMD="dims" || $SUBCMD='add' || $SUBCMD='transpose') ]]
+  then
+    if [ $DEBUG ]
+    then
+      echo "Checking for stdin"
+    fi
+    #test for stdin
+    cat > $INFILE
+    echo "cattting INFILE"
+    cat $INFILE
+    if [ ! -r $INFILE ]
+    then
+      _EXITCODE=$BADARGCNT
+      quit
+    elif [ $DEBUG ]
+    then
+      echo "New file from stdin is readable."
+    fi
+  #if args == 1, then check for incorrect subcmd
+  elif [[ ($subargs -eq 1) && ($SUBCMD = 'add' || $SUBCMD = 'multiply') ]]
   then
     _EXITCODE=$BADARGCNT
     quit
+  #if args > 1, and subcmd takes only one arg, indicate that the second will be ignored
+  elif [[ ( $subargs -gt 1 ) && ( $SUBCMD = 'dims' || $SUBCMD = 'add' || $SUBCMD='transpose' ) ]]
+  then
+      echo "The dims, transpose, and mean commands take only one argument; all others will be
+      ignored"
   fi
+  # default is to assign the first file argument to input var
+  INFILE="$1"
   return 0   
 }
 
-# checks for valid file or stdin input; assumed that this is called after chk_arg_count and 
-# ...at least one arg is present
-chk_input() {
-  # if we're getting input from stdin and the second parameter is null, okay 
-  if [[ -t 0 && -n $2 ]] 
-  then
-    return 0
-  # however, if both stdin and a second (presumably file) parameter are given, bad
-  elif [[ -t 0 && "$2" ]]
+# checks for valid file(s); assumed that this is called after chk_arg_count
+# assumes that file arguments to script are passed in to function as $1 and $2
+chk_input() 
+{
+  if [ $DEBUG ]
   then 
-    _EXITCODE=$BADINPUT
-    quit
-  # if nothing's on stdin and a second (presumably file) parameter is readable, good
-  elif [[ -t 1 && -r $2 ]]
+    echo -e "In chk_input()..."
+    echo "$1" 
+    cat "$1"
+  fi
+  #if we're getting input from a single file...
+  if [[ -f "$1" && -r "$1" && -s "$1" ]]
   then
-    return 0 
-  # if nothing's on stdin and a second (presumably file) parameter is not readable, bad
-  elif [[ -t 1 && -r $2 ]]
+    if [ $DEBUG ]
+    then
+      echo "First file readable"
+    else 
+      echo "First arg/file not readable."
+    fi
+    if [[ ($SUBCMD = 'dims' || $SUBCMD != 'add' || $SUBCMD != 'transpose') ]]
+    then
+      return 0
+    #check if we should validate a second file argument 
+    elif [[ ($SUBCMD = 'add' || $SUBCMD = 'multiply') && \
+      ($SUBCMD != 'dims' && $SUBCMD != 'add' && $SUBCMD != 'transpose') ]]
+      then 
+        if [[ -f "$2" && -r "$2" && -s "$2" ]]
+        then
+          if [ $DEBUG ] 
+          then
+            echo "Second file readable"
+          fi
+          return 0
+        fi
+    else 
+      _EXITCODE="$BADFILEINPUT" 
+      quit
+    fi
+  #then check if we're not getting input from stdin
+  elif [[ ! -f $INFILE && ! -r $INFILE && ! -s $INFILE ]]
   then
-    _EXITCODE=$BADINPUT
+    if [ $DEBUG ]
+    then
+      echo $INFILE
+      echo "Can't read file created from stdinput"
+    fi
+    _EXITCODE="$BADFILEINPUT" 
     quit
   fi
 }
@@ -76,42 +137,159 @@ quit()
   case $_EXITCODE in 
     "$BADCMD") echo -e "Usage: \tmatrix dims [MATRIX]\n\tmatrix transpose [MATRIX]"\
       "\n\tmatrix mean [MATRIX]\n\tmatrix add MATRIX1 MATRIX2"\
-      "\n\tmatrix multiply MATRIX1 MATRIX2\n" >&2;;
-    "$BADARGCNT") echo 'Error: Number of arguments to subcommand invalid' >&2;;
-    "$BADINPUT") echo "Error: File input not readable or too many inputs provided (stdin and file)\n";;
+      "\n\tmatrix multiply MATRIX1 MATRIX2" >&2;;
+    "$BADARGCNT") echo -e "Error: Number of arguments to subcommand invalid" >&2;;
+    "$BADINPUT") echo -e "Error: File input not readable or too many inputs provided (stdin and"\
+      "file)" >&2;;
+    "$BADFILEINPUT") echo -e "Error: Wrong number of files or unable to read files supplied" >&2;;
   esac
   exit $_EXITCODE
 }
 
-dims() {
-  echo -e "In dims\n"
+#counts the number of columns; expects a string
+get_row_cnt()
+{
+  local count=0
+  if [ $DEBUG ]
+  then
+    echo $1
+  fi
+  
+  while read nop
+  do
+    ((count++))
+  done < $1
+  _RET=$count
+  return 0
 }
 
-transpose() {
-  echo nuts
+dims() 
+{
+  local col_cnt
+  local row_cnt
+
+  #get column count
+  read line1 < $1 
+  col_cnt=$(echo $line1 | wc -w)
+
+  #get row cnt
+  row_cnt=$(wc -l < $1)
+  
+  if [ $DEBUG ] 
+  then 
+    echo -e "Column count: $col_cnt"
+    echo -e "Row count: $row_cnt"
+  fi
+  
+  echo -e "$row_cnt $col_cnt"
+  exit 0
+}
+
+transpose() 
+{
+  # get row cnt
+  row_cnt=$(wc -l < $1)
+
+  if [ $DEBUG ]
+  then
+    echo -e "In transpose..."
+    ehco -e "Row count: $row_cnt"
+  fi
+  #using arrays like we were instucted not to do
+  #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
+  i=0
+  while IFS=$'\n' read -r line
+  do
+    readarray -t -d$'\t' rowarr$i <<< "$line"; declare -p rowarr$i;
+    ((i++))
+  done < "$1"
+
+  #for each column we create a string that will represent a row
+  z=0 
+  for (( c = 0; c < $row_cnt; c++ ))
+  do
+    var="rowarr$c[@]"
+    for e in "${!var}"
+    do
+      newrow$c="newrow$c$'\t'$e"
+    done
+  done
+
 }
 
 mean() {
   echo nop
 }
 
-add() {
-  echo nop
+add() 
+{
+  local dims1=$(expr dims "$1")
+  local dims2=$(expr dims "$2")
+  if [[ $dims1 != $dims2 ]]
+  then
+    _EXITCODE=$INCOMPATIBLE
+  fi
 }
 
 multiply() {
-  echo nop
+  local dims1=$(expr dims "$1")
+  local dims2=$(expr dims "$2")
+  cut  
+  if [[ $dims1 != $dims2 ]]
+  then
+    echo nop
+  fi
 }
 
 usage 
 if [ "$SUBCMD" = "dims" ]
 then
   #dims only takes one argument
-  if chk_arg_count 1;
+  if [[ $(chk_arg_count $2) ]] 
   then
-    if chk_input $2;
+    cat $INFILE
+    if chk_input "$INFILE"
     then
-      dims "${@:2}"
+      dims "$INFILE"
+    fi
+  fi
+fi
+
+if [ "$SUBCMD" = "transpose" ]
+then
+  #transpose takes one argument
+  if chk_arg_count
+  then
+    if chk_input $2
+    then
+      transpose $INFILE
+    fi
+  fi
+fi
+
+if [ "$SUBCMD" = "mean" ]
+then
+  #mean takes one argument
+  if chk_arg_count
+  then
+    if chk_input $2
+    then
+      mean $INFILE 
+    fi
+  fi
+fi
+
+if [ "$SUBCMD" = "add" ]
+then
+  #add takes two arguments
+  if chk_arg_count
+  then
+    if chk_input;
+    then
+      if [[  $(chk_file_empty $2) && $(chk_file_empty $3) ]]
+      then
+        add $2 $3
+      fi
     fi
   fi
 fi
