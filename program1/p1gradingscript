@@ -304,7 +304,7 @@ else
 fi
 
 chmod +x "$cmd" # Make sure submission is executable
-dos2unix "$cmd" # Fix windows newlines (^M errors)
+#dos2unix "$cmd" # Fix windows newlines (^M errors)
 
 cd "$(dirname "$cmd")" # Change working directory to submission file
 cmd="$(basename "$cmd")"
@@ -395,7 +395,7 @@ expect_success 3 5 "cat $m3 | ./$cmd dims" "$message" <<< "3 8"
 
 echo "Passing m4 (8x5) to dims on stdin (3pt):" | tee -a "$log"
 message="dimensions output is incorrect"
-expect_success 3 5 "./$cmd dims $m4" "$message" <<< "8 5"
+expect_success 3 5 "./$cmd dims $m4" "$message" <<< "8 5\n"
 ((points+=score))
 
 

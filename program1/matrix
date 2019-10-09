@@ -13,6 +13,8 @@ SUBCMD=$1
 SUBCMDARGCNT=0
 INFILE="infile$$"
 INFILETWO="infiletwo$$"
+ROWCNT=0
+COLCNT=0
 _RET=""
 
 # checks that SUBCMD is one of the five implemented functions
@@ -38,7 +40,7 @@ chk_arg_count()
   if [ $DEBUG ]
   then
     echo -e "In chk_arg_count()..."
-    echo \$1 "$1"
+    echo "$1"
   fi
   local subargs=$(expr $NUMARGS - 1)
   #if number of args is less than one, chk stdin
@@ -49,12 +51,10 @@ chk_arg_count()
       echo "Checking for stdin"
     fi
     #test for stdin
-    cat > $INFILE
-    echo "cattting INFILE"
-    cat $INFILE
-    if [ ! -r $INFILE ]
+    cat > "$INFILE"
+    if [ ! -r "$INFILE" ]
     then
-      _EXITCODE=$BADARGCNT
+      _EXITCODE="$BADARGCNT"
       quit
     elif [ $DEBUG ]
     then
@@ -68,12 +68,12 @@ chk_arg_count()
   #if args > 1, and subcmd takes only one arg, indicate that the second will be ignored
   elif [[ ( $subargs -gt 1 ) && ( $SUBCMD = 'dims' || $SUBCMD = 'add' || $SUBCMD='transpose' ) ]]
   then
-      echo "The dims, transpose, and mean commands take only one argument; all others will be
-      ignored"
+      _EXITCODE=$BADARGCNT
+      quit
   fi
   # default is to assign the first file argument to input var
-  INFILE="$1"
-  return 0   
+  declare INFILE="$1"
+  _RET=0   
 }
 
 # checks for valid file(s); assumed that this is called after chk_arg_count
@@ -93,7 +93,7 @@ chk_input()
     fi
     if [[ ($SUBCMD = 'dims' || $SUBCMD != 'add' || $SUBCMD != 'transpose') ]]
     then
-      return 0
+      _RET=0
     #check if we should validate a second file argument 
     elif [[ $SUBCMD = 'add' || $SUBCMD = 'multiply' ]]
       then 
@@ -104,7 +104,7 @@ chk_input()
             echo "Second file readable"
           fi
           INFILETWO="$2"
-          return 0
+          _RET=0
         fi
     else 
       _EXITCODE="$BADFILEINPUT" 
@@ -115,8 +115,8 @@ chk_input()
     if [ $DEBUG ]
     then
       echo "Can't read file created from stdinput"
-      echo "INFILE: $INFILE"
-      cat $INFILE
+      echo INFILE: "$INFILE"
+      cat "$INFILE"
     fi
     _EXITCODE="$BADFILEINPUT" 
     quit
@@ -140,6 +140,8 @@ quit()
       "file)" >&2;;
     "$BADFILEINPUT") echo -e "Error: Wrong number of files or unable to read files supplied" >&2;;
   esac
+  #clean up tmp files
+  rm -f "tmpfile$$" "infile$$" 
   exit $_EXITCODE
 }
 
@@ -160,6 +162,8 @@ get_row_cnt()
   return 0
 }
 
+# expects two arguments, one the input file, and a second, numeric flag that is used for internal
+# ...calls from other scripts that should not produce output
 dims() 
 {
   local col_cnt
@@ -178,44 +182,114 @@ dims()
     echo -e "Row count: $row_cnt"
   fi
   
-  echo -e "$row_cnt $col_cnt"
-  exit 0
+  ROWCNT=$row_cnt 
+  COLCNT=$col_cnt 
+  if [[ "$2" -eq 0 ]]
+  then
+    return 0
+  else
+    echo -e "$row_cnt $col_cnt"
+    exit 0
+  fi
 }
 
 transpose() 
 {
-  # get row cnt
-  row_cnt=$(wc -l < $1)
+  dims "$1" 0
+  local row_cnt=$ROWCNT
+  local col_cnt=$COLCNT
 
   if [ $DEBUG ]
   then
     echo -e "In transpose..."
-    ehco -e "Row count: $row_cnt"
+    echo -e "Row count: $row_cnt"
   fi
-  #using arrays like we were instucted not to do
+  #using arrays like we were advised _not_ to do
   #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
   i=0
   while IFS=$'\n' read -r line
   do
-    readarray -t -d$'\t' rowarr$i <<< "$line"; declare -p rowarr$i;
+    readarray -t -d$'\t' rowarr$i < <(printf "%s" "$line")
     ((i++))
   done < "$1"
 
   #for each column we create a string that will represent a row
-  z=0 
   for (( c = 0; c < $row_cnt; c++ ))
   do
     var="rowarr$c[@]"
-    for e in "${!var}"
+    #avoid printing a trailing tab
+    g=`expr $row_cnt - 1`
+    for (( z = 0; z < $col_cnt; z++ ))
     do
-      newrow$c="newrow$c$'\t'$e"
+      nr="rowarr$c[$z]"
+      if [ -z "newrow$z" ]
+      then
+        declare "newrow$z"=""
+      fi
+      if [ "$c" -eq "$g" ]
+      then
+        eval "newrow$z"+="${!nr}"
+      else
+        eval "newrow$z"+="${!nr}$'\t'"
+      fi
+      #echo $"newrow$z" #printf -v "newrow$c" "%s" "$e$'\t'"
+      #declare -p "newrow$z"
+      #"${!nr}"="$e"
+      #printf -v "${!nr}" "%s" "foo"
+      #printf -v "${!nr}" "%s" "$e\t"
+      #${!nr} ="${!nr}\t$e"
     done
   done
-
+  for (( p = 0; p < $col_cnt; p++ ))
+  do
+    out="newrow$p"
+    echo "${!out}"
+  done
 }
 
-mean() {
-  echo nop
+mean() 
+{
+  dims "$1" 0
+  local row_cnt=$ROWCNT
+  local col_cnt=$COLCNT
+
+  if [ $DEBUG ]
+  then
+    echo -e "In mean..."
+    echo -e "Row count: $row_cnt"
+  fi
+  #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
+  i=0
+  while IFS=$'\n' read -r line
+  do
+    readarray -t -d$'\t' rowarr$i < <(printf "%s" "$line")
+    ((i++))
+  done < "$1"
+
+  #for each column we create a sum that will be an element in our 1D output
+  for (( c = 0; c < $row_cnt; c++ ))
+  do
+    var="rowarr$c[@]"
+    #avoid printing a trailing tab
+    g=`expr $row_cnt - 1`
+    for (( z = 0; z < $col_cnt; z++ ))
+    do
+      nr="rowarr$c[$z]"
+      #let's not overwrite our per-column val 
+      if [ -z "sum$z" ]
+      then
+        declare -i "sum$z"=0
+      fi
+      let "sum$z"+=${!nr}
+    done
+  done
+  outline=""
+  for (( p = 0; p < $col_cnt; p++ ))
+  do
+    out="sum$p"
+    outline+="${!out}\t"
+  done
+  echo -e "$outline"
 }
 
 add() 
@@ -242,9 +316,11 @@ usage
 if [ "$SUBCMD" = "dims" ]
 then
   #dims only takes one argument
-  if chk_arg_count "$2"
+  chk_arg_count "$2"
+  if [[ $_RET -eq 0 ]]
   then
-    if chk_input "$INFILE"
+    chk_input "$INFILE"
+    if [[ $_RET -eq 0 ]]
     then
       dims "$INFILE"
     fi
@@ -253,12 +329,14 @@ fi
 
 if [ "$SUBCMD" = "transpose" ]
 then
-  #transpose takes one argument
-  if chk_arg_count
+  #transpose only takes one argument
+  chk_arg_count "$2"
+  if [[ $_RET -eq 0 ]]
   then
-    if chk_input $2
+    chk_input "$INFILE"
+    if [[ $_RET -eq 0 ]]
     then
-      transpose $INFILE
+      transpose "$INFILE"
     fi
   fi
 fi
@@ -266,11 +344,13 @@ fi
 if [ "$SUBCMD" = "mean" ]
 then
   #mean takes one argument
-  if chk_arg_count
+  chk_arg_count "$2"
+  if [[ $_RET -eq 0 ]]
   then
-    if chk_input $2
+    chk_input "$INFILE"
+    if [[ $_RET -eq 0 ]]
     then
-      mean $INFILE 
+      mean "$INFILE"
     fi
   fi
 fi
