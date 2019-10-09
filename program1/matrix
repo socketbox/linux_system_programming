@@ -12,6 +12,7 @@ NUMARGS=$#
 SUBCMD=$1
 SUBCMDARGCNT=0
 INFILE="infile$$"
+INFILETWO="infiletwo$$"
 _RET=""
 
 # checks that SUBCMD is one of the five implemented functions
@@ -82,8 +83,6 @@ chk_input()
   if [ $DEBUG ]
   then 
     echo -e "In chk_input()..."
-    echo "$1" 
-    cat "$1"
   fi
   #if we're getting input from a single file...
   if [[ -f "$1" && -r "$1" && -s "$1" ]]
@@ -91,15 +90,12 @@ chk_input()
     if [ $DEBUG ]
     then
       echo "First file readable"
-    else 
-      echo "First arg/file not readable."
     fi
     if [[ ($SUBCMD = 'dims' || $SUBCMD != 'add' || $SUBCMD != 'transpose') ]]
     then
       return 0
     #check if we should validate a second file argument 
-    elif [[ ($SUBCMD = 'add' || $SUBCMD = 'multiply') && \
-      ($SUBCMD != 'dims' && $SUBCMD != 'add' && $SUBCMD != 'transpose') ]]
+    elif [[ $SUBCMD = 'add' || $SUBCMD = 'multiply' ]]
       then 
         if [[ -f "$2" && -r "$2" && -s "$2" ]]
         then
@@ -107,6 +103,7 @@ chk_input()
           then
             echo "Second file readable"
           fi
+          INFILETWO="$2"
           return 0
         fi
     else 
@@ -114,12 +111,12 @@ chk_input()
       quit
     fi
   #then check if we're not getting input from stdin
-  elif [[ ! -f $INFILE && ! -r $INFILE && ! -s $INFILE ]]
-  then
+  else 
     if [ $DEBUG ]
     then
-      echo $INFILE
       echo "Can't read file created from stdinput"
+      echo "INFILE: $INFILE"
+      cat $INFILE
     fi
     _EXITCODE="$BADFILEINPUT" 
     quit
@@ -245,9 +242,8 @@ usage
 if [ "$SUBCMD" = "dims" ]
 then
   #dims only takes one argument
-  if [[ $(chk_arg_count $2) ]] 
+  if chk_arg_count "$2"
   then
-    cat $INFILE
     if chk_input "$INFILE"
     then
       dims "$INFILE"
