@@ -1,5 +1,5 @@
 #!/bin/bash
-trap "rm -f tmpfile$$ infile$$; echo 'SIGINT received: Deleting temp file then exiting!'; exit 1" INT
+trap "rm -f tmpfile$$ infile$$ infiletwo$$; echo 'SIGINT received: Deleting temp file then exiting!'; exit 1" INT
 #exit codes
 _EXITCODE=-1
 #prints uasage
@@ -322,7 +322,7 @@ then
     chk_input "$INFILE"
     if [[ $_RET -eq 0 ]]
     then
-      dims "$INFILE"
+      dims "$INFILE" 1
     fi
   fi
 fi
@@ -370,3 +370,5 @@ then
   fi
 fi
 
+#cleanup files if any leftover
+rm -f tmpfile$$ infile$$ infiletwo$$
