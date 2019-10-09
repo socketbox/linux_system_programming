@@ -20,7 +20,7 @@ _RET=""
 # checks that SUBCMD is one of the five implemented functions
 usage() 
 {
-  if [ $DEBUG ]
+  if [ "$DEBUG" ]
   then
     echo -e "In usage()..."
     echo -e "\tSUBCMD is $SUBCMD"
@@ -37,16 +37,16 @@ usage()
 # out: INFILE is set to a valid file
 chk_arg_count()
 {
-  if [ $DEBUG ]
+  if [ "$DEBUG" ]
   then
     echo -e "In chk_arg_count()..."
-    echo "$1"
+    echo "This is arg to func: $1"
   fi
   local subargs=$(expr $NUMARGS - 1)
   #if number of args is less than one, chk stdin
-  if [[ ($subargs -lt 1) && ($SUBCMD="dims" || $SUBCMD='add' || $SUBCMD='transpose') ]]
+  if [[ ($subargs -lt 1) && ($SUBCMD = "dims" || $SUBCMD = 'add' || $SUBCMD = 'transpose') ]]
   then
-    if [ $DEBUG ]
+    if [ "$DEBUG" ]
     then
       echo "Checking for stdin"
     fi
@@ -56,7 +56,7 @@ chk_arg_count()
     then
       _EXITCODE="$BADARGCNT"
       quit
-    elif [ $DEBUG ]
+    elif [ "$DEBUG" ]
     then
       echo "New file from stdin is readable."
     fi
@@ -66,28 +66,28 @@ chk_arg_count()
     _EXITCODE=$BADARGCNT
     quit
   #if args > 1, and subcmd takes only one arg, indicate that the second will be ignored
-  elif [[ ( $subargs -gt 1 ) && ( $SUBCMD = 'dims' || $SUBCMD = 'add' || $SUBCMD='transpose' ) ]]
+  elif [[ ( $subargs -gt 1 ) && ( $SUBCMD = 'dims' || $SUBCMD = 'add' || $SUBCMD = 'transpose' ) ]]
   then
       _EXITCODE=$BADARGCNT
       quit
   fi
   # default is to assign the first file argument to input var
-  declare INFILE="$1"
-  _RET=0   
+	define INFILE="$1"
+	_RET=0   
 }
 
 # checks for valid file(s); assumed that this is called after chk_arg_count
 # assumes that file arguments to script are passed in to function as $1 and $2
 chk_input() 
 {
-  if [ $DEBUG ]
+  if [ "$DEBUG" ]
   then 
     echo -e "In chk_input()..."
   fi
   #if we're getting input from a single file...
   if [[ -f "$1" && -r "$1" && -s "$1" ]]
   then
-    if [ $DEBUG ]
+    if [ "$DEBUG" ]
     then
       echo "First file readable"
     fi
@@ -99,7 +99,7 @@ chk_input()
       then 
         if [[ -f "$2" && -r "$2" && -s "$2" ]]
         then
-          if [ $DEBUG ] 
+          if [ "$DEBUG" ] 
           then
             echo "Second file readable"
           fi
@@ -112,7 +112,7 @@ chk_input()
     fi
   #then check if we're not getting input from stdin
   else 
-    if [ $DEBUG ]
+    if [ "$DEBUG" ]
     then
       echo "Can't read file created from stdinput"
       echo INFILE: "$INFILE"
@@ -125,7 +125,7 @@ chk_input()
 
 quit() 
 {
-  if [ $DEBUG ]
+  if [ "$DEBUG" ]
   then
     echo -e "In quit()..."
     echo -e "\t _EXITCODE is $_EXITCODE"
@@ -149,7 +149,7 @@ quit()
 get_row_cnt()
 {
   local count=0
-  if [ $DEBUG ]
+  if [ "$DEBUG" ]
   then
     echo $1
   fi
@@ -176,7 +176,7 @@ dims()
   #get row cnt
   row_cnt=$(wc -l < $1)
   
-  if [ $DEBUG ] 
+  if [ "$DEBUG" ] 
   then 
     echo -e "Column count: $col_cnt"
     echo -e "Row count: $row_cnt"
@@ -199,7 +199,7 @@ transpose()
   local row_cnt=$ROWCNT
   local col_cnt=$COLCNT
 
-  if [ $DEBUG ]
+  if [ "$DEBUG" ]
   then
     echo -e "In transpose..."
     echo -e "Row count: $row_cnt"
@@ -240,7 +240,7 @@ transpose()
       #${!nr} ="${!nr}\t$e"
     done
   done
-  for (( p = 0; p < $col_cnt; p++ ))
+  for (( p = 0; p < "$col_cnt"; p++ ))
   do
     out="newrow$p"
     echo "${!out}"
@@ -253,7 +253,7 @@ mean()
   local row_cnt=$ROWCNT
   local col_cnt=$COLCNT
 
-  if [ $DEBUG ]
+  if [ "$DEBUG" ]
   then
     echo -e "In mean..."
     echo -e "Row count: $row_cnt"
@@ -272,7 +272,7 @@ mean()
     var="rowarr$c[@]"
     #avoid printing a trailing tab
     g=`expr $row_cnt - 1`
-    for (( z = 0; z < $col_cnt; z++ ))
+    for (( z = 0; z < "$col_cnt"; z++ ))
     do
       nr="rowarr$c[$z]"
       #let's not overwrite our per-column val 
@@ -284,7 +284,7 @@ mean()
     done
   done
   outline=""
-  for (( p = 0; p < $col_cnt; p++ ))
+  for (( p = 0; p < "$col_cnt"; p++ ))
   do
     out="sum$p"
     outline+="${!out}\t"
@@ -362,9 +362,9 @@ then
   then
     if chk_input;
     then
-      if [[  $(chk_file_empty $2) && $(chk_file_empty $3) ]]
+      if [[  $(chk_file_empty "$2") && $(chk_file_empty "$3") ]]
       then
-        add $2 $3
+        add "$2" "$3"
       fi
     fi
   fi
