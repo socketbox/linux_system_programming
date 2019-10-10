@@ -13,8 +13,8 @@ SUBCMD=$1
 SUBCMDARGCNT=0
 INFILE="infile$$"
 INFILETWO="infiletwo$$"
-ROWCNT=0
-COLCNT=0
+_ROWCNT=0
+_COLCNT=0
 _RET=""
 
 # checks that SUBCMD is one of the five implemented functions
@@ -148,6 +148,7 @@ quit()
     "$BADINPUT") echo -e "Error: File input not readable or too many inputs provided (stdin and"\
       "file)" >&2;;
     "$BADFILEINPUT") echo -e "Error: Wrong number of files or unable to read files supplied" >&2;;
+		*);;
   esac
   #clean up tmp files
   rm -f "tmpfile$$" "infile$$" 
@@ -173,6 +174,7 @@ get_row_cnt()
 
 # expects two arguments, one the input file, and a second, numeric flag that is used for internal
 # ...calls from other scripts that should not produce output
+# out: if invoked with 1 as second arg, row\<space>col of matrix on stdin; if second arg is 0, sets $_ROWCNT and _COLCNT for use by calling function
 dims() 
 {
   local col_cnt
@@ -191,22 +193,24 @@ dims()
     echo -e "Row count: $row_cnt"
   fi
   
-  ROWCNT=$row_cnt 
-  COLCNT=$col_cnt 
+  _ROWCNT=$row_cnt 
+  _COLCNT=$col_cnt 
+  #if "internal" flag is set, we're being called by another func. and don't want to send to stdout 
   if [[ "$2" -eq 0 ]]
   then
     return 0
   else
     echo -e "$row_cnt $col_cnt"
-    exit 0
+	_EXITCODE=0    
+	quit 
   fi
 }
 
 transpose() 
 {
   dims "$1" 0
-  local row_cnt=$ROWCNT
-  local col_cnt=$COLCNT
+  local row_cnt=$_ROWCNT
+  local col_cnt=$_COLCNT
 
   if [ "$DEBUG" ]
   then
@@ -218,8 +222,12 @@ transpose()
   i=0
   while IFS=$'\n' read -r line
   do
-    readarray -t -d$'\t' rowarr$i < <(printf "%s" "$line")
-    ((i++))
+    IFS=$'\t'; read -ra rowarr$i < <(printf "%s" "$line")
+		if [ $DEBUG ]
+		then
+			declare -p "rowarr$i"
+		fi
+		((i++))
   done < "$1"
 
   #for each column we create a string that will represent a row
@@ -254,13 +262,38 @@ transpose()
     out="newrow$p"
     echo "${!out}"
   done
+	_EXITCODE=0
+	quit
+}
+
+# takes a numerator and denominator, divides and rounds the quotient
+mean_round()
+{
+	#follows the formula: (a + (b/2)*( (a>0)*2-1 )) / b
+	num=$1
+	den=$2
+	if [ "$DEBUG" ]
+	then
+		echo "In mean_round..."
+		echo "num: $num"
+		echo "den: $den"
+	fi
+	#https://stackoverflow.com/questions/3953645/ternary-operator-in-bash
+	sgn=$([ "$num" -gt 0 ] && echo 1 || echo 0)
+	let quot="( ( num + ( den/2 ) * ( ( sgn*2 ) - 1 ) ) / den )"
+	if [ "$DEBUG" ]
+	then
+		echo "sgn: $sgn"
+		echo "quot: $quot"
+	fi
+	_RET="$quot"
 }
 
 mean() 
 {
   dims "$1" 0
-  local row_cnt=$ROWCNT
-  local col_cnt=$COLCNT
+  local row_cnt=$_ROWCNT
+  local col_cnt=$_COLCNT
 
   if [ "$DEBUG" ]
   then
@@ -271,12 +304,12 @@ mean()
   i=0
   while IFS=$'\n' read -r line
   do
-    readarray -t -d$'\t' rowarr$i < <(printf "%s" "$line")
+    IFS=$'\t'; read -ra rowarr$i < <(printf "%s" "$line")
     ((i++))
   done < "$1"
 
   #for each column we create a sum that will be an element in our 1D output
-  for (( c = 0; c < $row_cnt; c++ ))
+  for (( c = 0; c < "$row_cnt"; c++ ))
   do
     var="rowarr$c[@]"
     #avoid printing a trailing tab
@@ -295,30 +328,213 @@ mean()
   outline=""
   for (( p = 0; p < "$col_cnt"; p++ ))
   do
-    out="sum$p"
-    outline+="${!out}\t"
+		num="sum$p"
+		mean_round ${!num} "$row_cnt"
+    outline+="$_RET\t"
   done
   echo -e "$outline"
+	_EXITCODE=0
+	quit
+}
+
+#in 1: 'a' or 'm', to check whether the two matrices can be feasibly added or mulitplied
+#in 2 and 3: the two matrices in question
+#out: 0 or 1 in $_RET
+feasible()
+{
+	_RET=1
+  dims "$2" 0
+	m1r="$_ROWCNT"
+	m1c="$_COLCNT"
+  
+	dims "$3" 0
+	m2r="$_ROWCNT"
+	m2c="$_COLCNT"
+
+	#can we add them?
+	if [ "$1" == 'a' ]
+	then
+		if [[ $m1r -ne $m2r || $m1c -ne $m2c ]]
+		then
+			return 1
+		fi
+	elif [ "$1" == 'm' ]
+	then
+		if [[ "$m1c" -ne "$m2r" ]]
+		then
+			return 1
+		fi
+	else
+		echo "Wrong argument, $1, to func feasible()" >&2
+		return 1
+	fi
+
+	_RET=0
+	return 0
 }
 
 add() 
 {
-  local dims1=$(expr dims "$1")
-  local dims2=$(expr dims "$2")
-  if [[ $dims1 != $dims2 ]]
+	feasible 'a' "$1" "$2"
+	if [ "$_RET" -eq 1 ]
   then
-    _EXITCODE=$INCOMPATIBLE
+		if [ "$DEBUG" ]
+		then
+			echo "infeasible"
+		fi
+		_EXITCODE=$INCOMPATIBLE
+		quit
   fi
+  
+  if [ "$DEBUG" ]
+  then
+		echo "In add() after feasible..."
+	  echo "file1: $1"
+	  echo "file2: $2"
+	  echo "row_cnt: $_ROWCNT"
+  fi
+
+  #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
+  i=0
+  while IFS=$'\n' read -r line
+  do
+    IFS=$'\t'; read -ra mat1row$i < <(printf "%s" "$line")
+    ((i++))
+  done < "$1"
+
+	#get a set of arrays for the second matrix
+  j=0
+  while IFS=$'\n' read -r line
+  do
+    IFS=$'\t'; read -ra mat2row$j < <(printf "%s" "$line")
+    ((j++))
+  done < "$2"
+
+	#loop through the two sets of arrays and create a third
+	for (( k = 0; k < "$_ROWCNT"; k++ ))  
+	do
+		for ((q = 0; q < "$_COLCNT"; q++ ))
+		do
+			local m1r="mat1row$k[$q]"
+			local m2r="mat2row$k[$q]"
+			#let's not overwrite our new row
+			if [ ! -v "mat3row$k" ]
+			then
+				declare -a "mat3row$k"
+				if [ "$DEBUG" ]
+				then
+					declare -p "mat3row$k"	
+				fi
+			fi
+			m3r="mat3row$k[$q]"
+			let "mat3row$k[$q]"=${!m1r}
+			let "mat3row$k[$q]"+=${!m2r}
+			
+			if [ "$DEBUG" ]
+			then
+				echo "'mat1row$k[$q]': ${!m1r}"
+				echo "'mat2row$k[$q]': ${!m2r}"
+				echo "'mat3row$k[$q]': ${!m3r}"
+			fi
+		done
+	done
+	
+	#print out the third array
+	outline=""
+  for (( r = 0; r < "$_ROWCNT"; r++ ))
+  do
+		for (( s = 0; s < "$_ROWCNT"; s++ ))
+		do
+			num="mat3row$r[$s]"			
+			outline+="${!num}\t"
+		done
+		echo -e "$outline"
+		outline=""
+	done
+	_EXITCODE=0
+	quit
 }
 
-multiply() {
-  local dims1=$(expr dims "$1")
-  local dims2=$(expr dims "$2")
-  cut  
-  if [[ $dims1 != $dims2 ]]
+multiply() 
+{
+	feasible 'm' "$1" "$2"
+	if [ "$_RET" -eq 1 ]
   then
-    echo nop
+		if [ "$DEBUG" ]
+		then
+			echo "infeasible"
+		fi
+		_EXITCODE=$INCOMPATIBLE
+		quit
   fi
+  
+  if [ "$DEBUG" ]
+  then
+		echo "In add() after feasible..."
+	  echo "file1: $1"
+	  echo "file2: $2"
+	  echo "row_cnt: $_ROWCNT"
+  fi
+
+  #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
+  i=0
+  while IFS=$'\n' read -r line
+  do
+    IFS=$'\t'; read -ra mat1row$i < <(printf "%s" "$line")
+    ((i++))
+  done < "$1"
+
+	#get a set of arrays for the second matrix
+  j=0
+  while IFS=$'\n' read -r line
+  do
+    IFS=$'\t'; read -ra mat2row$j < <(printf "%s" "$line")
+    ((j++))
+  done < "$2"
+
+	#loop through the two sets of arrays and create a third
+	for (( k = 0; k < "$_ROWCNT"; k++ ))  
+	do
+		for ((q = 0; q < "$_COLCNT"; q++ ))
+		do
+			local m1r="mat1row$k[$q]"
+			local m2r="mat2row$k[$q]"
+			#let's not overwrite our new row
+			if [ ! -v "mat3row$k" ]
+			then
+				declare -a "mat3row$k"
+				if [ "$DEBUG" ]
+				then
+					declare -p "mat3row$k"	
+				fi
+			fi
+			m3r="mat3row$k[$q]"
+			let "mat3row$k[$q]"=${!m1r}
+			let "mat3row$k[$q]"+=${!m2r}
+			
+			if [ "$DEBUG" ]
+			then
+				echo "'mat1row$k[$q]': ${!m1r}"
+				echo "'mat2row$k[$q]': ${!m2r}"
+				echo "'mat3row$k[$q]': ${!m3r}"
+			fi
+		done
+	done
+	
+	#print out the third array
+	outline=""
+  for (( r = 0; r < "$_ROWCNT"; r++ ))
+  do
+		for (( s = 0; s < "$_ROWCNT"; s++ ))
+		do
+			num="mat3row$r[$s]"			
+			outline+="${!num}\t"
+		done
+		echo -e "$outline"
+		outline=""
+	done
+	_EXITCODE=0
+	quit
 }
 
 usage 
@@ -367,17 +583,39 @@ fi
 if [ "$SUBCMD" = "add" ]
 then
   #add takes two arguments
-  if chk_arg_count
+  chk_arg_count "$2" "$3"
+  if [[ "$_RET" -eq 0 ]] 
   then
-    if chk_input;
-    then
-      if [[  $(chk_file_empty "$2") && $(chk_file_empty "$3") ]]
-      then
-        add "$2" "$3"
-      fi
-    fi
+    chk_input "$2"
+    if [[ $_RET -eq 0 ]]
+	then
+		chk_input "$3"
+		if [[ $_RET -eq 0 ]]
+		then
+			add "$2" "$3"
+		fi
+	fi
   fi
 fi
 
+if [ "$SUBCMD" = "multiply" ]
+then
+  #add takes two arguments
+  chk_arg_count "$2" "$3"
+  if [[ "$_RET" -eq 0 ]] 
+  then
+    chk_input "$2"
+    if [[ $_RET -eq 0 ]]
+	then
+		chk_input "$3"
+		if [[ $_RET -eq 0 ]]
+		then
+			multiply "$2" "$3"
+		fi
+	fi
+  fi
+fi
+
+
 #cleanup files if any leftover
-rm -f tmpfile$$ infile$$ infiletwo$$
+quit
