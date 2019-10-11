@@ -1,7 +1,7 @@
 #!/bin/bash
 trap 'rm -f tmpfile$$ infile$$; echo "SIGINT received: Deleting temp file then exiting!"; exit 1' INT
 #exit codes
-_EXITCODE=-1
+_EXITCODE=""
 #prints uasage
 BADCMD=3 
 BADARGCNT=5
@@ -185,7 +185,7 @@ transpose()
 	row_cnt=$(echo "$dimsout" | cut -d' ' -f 1)
 	col_cnt=$(echo "$dimsout" | cut -d' ' -f 2)
 
-  if [ ! "$DEBUG" ]
+  if [ "$DEBUG" ]
   then
     echo -e "In transpose..." >&2
     echo -e "Row count: $row_cnt" >&2
@@ -303,7 +303,12 @@ mean()
   do
 		num="sum$p"
 		mean_round ${!num} "$row_cnt"
-    outline+="$_RET\t"
+		if (( p == (col_cnt - 1) ))
+		then
+			eval outline+="$_RET"
+		else
+			eval outline+="$_RET$'\t'"
+		fi
   done
   echo -e "$outline"
 	_EXITCODE=0
