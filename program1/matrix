@@ -1,5 +1,5 @@
 #!/bin/bash
-trap "rm -f tmpfile$$ infile$$ infiletwo$$; echo 'SIGINT received: Deleting temp file then exiting!'; exit 1" INT
+trap 'rm -f tmpfile$$ infile$$; echo "SIGINT received: Deleting temp file then exiting!"; exit 1' INT
 #exit codes
 _EXITCODE=-1
 #prints uasage
@@ -7,14 +7,11 @@ BADCMD=3
 BADARGCNT=5
 BADINPUT=7
 BADFILEINPUT=9
+INCOMPATIBLE=11
 
 NUMARGS=$#
 SUBCMD=$1
-SUBCMDARGCNT=0
 INFILE="infile$$"
-INFILETWO="infiletwo$$"
-_ROWCNT=0
-_COLCNT=0
 _RET=""
 
 # checks that SUBCMD is one of the five implemented functions
@@ -22,8 +19,8 @@ usage()
 {
   if [ "$DEBUG" ]
   then
-    echo -e "In usage()..."
-    echo -e "\tSUBCMD is $SUBCMD"
+    echo -e "In usage()..." >&2
+    echo -e "\tSUBCMD is $SUBCMD" >&2
   fi
   case $SUBCMD in 
     dims|transpose|mean|add|multiply) return 0;;
@@ -39,30 +36,31 @@ chk_arg_count()
 {
   if [ "$DEBUG" ]
   then
-    echo -e "In chk_arg_count()..."
-    echo "This is arg to func: $1"
+    echo -e "In chk_arg_count()..." >&2
+    echo "This is first arg to func: $1" >&2
+    echo "This is second arg to func: $2" >&2
   fi
-  local subargs=$(expr $NUMARGS - 1)
-	if [ "$DEBUG" ]
+	local subargs=$((NUMARGS - 1))
+	if [[ "$DEBUG" ]]
 	then
-		echo "subargs: $subargs"
+		echo "subargs: $subargs" >&2
 	fi
 	#if number of args is less than one, chk stdin
 	if [[ ($subargs -lt 1) && ($SUBCMD = "dims" || $SUBCMD = 'mean' || $SUBCMD = 'transpose') ]]
 	then
-		if [ "$DEBUG" ]
+		if [[ "$DEBUG" ]]
 		then
-			echo "Checking for stdin"
+			echo "Checking for stdin" >&2 
 		fi
 		#read from stdin
 		cat > "$INFILE"
-		if [ ! -r "$INFILE" ]
+		if [[ ! -r "$INFILE" ]]
 		then
 			_EXITCODE="$BADARGCNT"
 			quit
-		elif [ "$DEBUG" ]
+		elif [[ "$DEBUG" ]]
 		then
-			echo "New file from stdin is readable."
+			echo "New file from stdin is readable." >&2
 		fi
 		#if args == 1, then check for incorrect subcmd
 	elif [[ ($subargs -eq 1) && ($SUBCMD = "dims" || $SUBCMD = 'mean' || $SUBCMD = 'transpose') ]]   
@@ -91,28 +89,28 @@ chk_input()
 {
   if [ "$DEBUG" ]
   then 
-    echo -e "In chk_input()..."
+    echo -e "In chk_input()..." >&2
   fi
   #if we're getting input from a single file...
   if [[ -f "$1" && -r "$1" && -s "$1" ]]
   then
     if [ "$DEBUG" ]
     then
-      echo "First file readable"
+      echo "First file readable" >&2
+      echo "subcmd: $SUBCMD" >&2
     fi
-    if [[ ($SUBCMD = 'dims' || $SUBCMD != 'add' || $SUBCMD != 'transpose') ]]
+		if [[ ( "$SUBCMD" = 'dims' || "$SUBCMD" != 'add' || "$SUBCMD" != 'transpose' ) ]]
     then
-      _RET=0
+      return 0
     #check if we should validate a second file argument 
-    elif [[ $SUBCMD = 'add' || $SUBCMD = 'multiply' ]]
+    elif [[ "$SUBCMD" = 'add' || "$SUBCMD" = 'multiply' ]]
       then 
         if [[ -f "$2" && -r "$2" && -s "$2" ]]
         then
           if [ "$DEBUG" ] 
           then
-            echo "Second file readable"
+            echo "Second file readable" >&2
           fi
-          INFILETWO="$2"
           _RET=0
         fi
     else 
@@ -123,8 +121,8 @@ chk_input()
   else 
     if [ "$DEBUG" ]
     then
-      echo "Can't read file created from stdinput"
-      echo INFILE: "$INFILE"
+      echo "Can't read file created from stdinput" >&2
+      echo INFILE: "$INFILE" >&2
       cat "$INFILE"
     fi
     _EXITCODE="$BADFILEINPUT" 
@@ -136,8 +134,8 @@ quit()
 {
   if [ "$DEBUG" ]
   then
-    echo -e "In quit()..."
-    echo -e "\t _EXITCODE is $_EXITCODE"
+    echo -e "In quit()..." >&2
+    echo -e "\t _EXITCODE is $_EXITCODE" >&2
   fi
   
   case $_EXITCODE in 
@@ -148,6 +146,7 @@ quit()
     "$BADINPUT") echo -e "Error: File input not readable or too many inputs provided (stdin and"\
       "file)" >&2;;
     "$BADFILEINPUT") echo -e "Error: Wrong number of files or unable to read files supplied" >&2;;
+    "$INCOMPATIBLE") echo -e "Error: Matrices cannot be used in requested operation" >&2;;
 		*);;
   esac
   #clean up tmp files
@@ -155,67 +154,41 @@ quit()
   exit $_EXITCODE
 }
 
-#counts the number of columns; expects a string
-get_row_cnt()
-{
-  local count=0
-  if [ "$DEBUG" ]
-  then
-    echo $1
-  fi
-  
-  while read nop
-  do
-    ((count++))
-  done < $1
-  _RET=$count
-  return 0
-}
-
 # expects two arguments, one the input file, and a second, numeric flag that is used for internal
 # ...calls from other scripts that should not produce output
-# out: if invoked with 1 as second arg, row\<space>col of matrix on stdin; if second arg is 0, sets $_ROWCNT and _COLCNT for use by calling function
+#out: row and col of the matrix provided, separated by a space
 dims() 
 {
   local col_cnt
   local row_cnt
 
   #get column count
-  read line1 < $1 
-  col_cnt=$(echo $line1 | wc -w)
+  read line1 < "$1"
+  col_cnt=$(echo "$line1"| wc -w)
 
   #get row cnt
-  row_cnt=$(wc -l < $1)
+  row_cnt=$(wc -l < "$1")
   
   if [ "$DEBUG" ] 
   then 
-    echo -e "Column count: $col_cnt"
-    echo -e "Row count: $row_cnt"
+    echo -e "Column count: $col_cnt" >&2
+    echo -e "Row count: $row_cnt" >&2
   fi
   
-  _ROWCNT=$row_cnt 
-  _COLCNT=$col_cnt 
-  #if "internal" flag is set, we're being called by another func. and don't want to send to stdout 
-  if [[ "$2" -eq 0 ]]
-  then
-    return 0
-  else
-    echo -e "$row_cnt $col_cnt"
-	_EXITCODE=0    
-	quit 
-  fi
+	echo -e "$row_cnt $col_cnt"
+	return 0
 }
 
 transpose() 
 {
-  dims "$1" 0
-  local row_cnt=$_ROWCNT
-  local col_cnt=$_COLCNT
+	dimsout=$(dims "$1")
+	row_cnt=$(echo "$dimsout" | cut -d' ' -f 1)
+	col_cnt=$(echo "$dimsout" | cut -d' ' -f 2)
 
-  if [ "$DEBUG" ]
+  if [ ! "$DEBUG" ]
   then
-    echo -e "In transpose..."
-    echo -e "Row count: $row_cnt"
+    echo -e "In transpose..." >&2
+    echo -e "Row count: $row_cnt" >&2
   fi
   #using arrays like we were advised _not_ to do
   #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
@@ -274,31 +247,31 @@ mean_round()
 	den=$2
 	if [ "$DEBUG" ]
 	then
-		echo "In mean_round..."
-		echo "num: $num"
-		echo "den: $den"
+		echo "In mean_round..." >&2
+		echo "num: $num" >&2
+		echo "den: $den" >&2
 	fi
 	#https://stackoverflow.com/questions/3953645/ternary-operator-in-bash
 	sgn=$([ "$num" -gt 0 ] && echo 1 || echo 0)
 	let quot="( ( num + ( den/2 ) * ( ( sgn*2 ) - 1 ) ) / den )"
 	if [ "$DEBUG" ]
 	then
-		echo "sgn: $sgn"
-		echo "quot: $quot"
+		echo "sgn: $sgn" >&2
+		echo "quot: $quot" >&2
 	fi
 	_RET="$quot"
 }
 
 mean() 
 {
-  dims "$1" 0
-  local row_cnt=$_ROWCNT
-  local col_cnt=$_COLCNT
+	dimsout=$(dims "$1")
+	row_cnt=$(echo "$dimsout" | cut -d' ' -f 1)
+	col_cnt=$(echo "$dimsout" | cut -d' ' -f 2)
 
   if [ "$DEBUG" ]
   then
-    echo -e "In mean..."
-    echo -e "Row count: $row_cnt"
+    echo -e "In mean..." >&2
+    echo -e "Row count: $row_cnt" >&2
   fi
   #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
   i=0
@@ -339,48 +312,56 @@ mean()
 
 #in 1: 'a' or 'm', to check whether the two matrices can be feasibly added or mulitplied
 #in 2 and 3: the two matrices in question
-#out: 0 or 1 in $_RET
+#out: the dimensions of both matrices, "row1 col1 row2 col2", 101 if infeasible
 feasible()
 {
-	_RET=1
-  dims "$2" 0
-	m1r="$_ROWCNT"
-	m1c="$_COLCNT"
+	m1dims=$( dims "$2" )
+	m1r=$(cut -d' ' -f 1 < <(echo "$m1dims"))
+	m1r=$(echo "$m1dims" | cut -d' ' -f 1)
+	m1c=$(echo "$m1dims" | cut -d' ' -f 2)
   
-	dims "$3" 0
-	m2r="$_ROWCNT"
-	m2c="$_COLCNT"
+	m2dims=$( dims "$3" )
+	m2r=$(echo "$m2dims" | cut -d' ' -f 2)
+	m2c=$(echo "$m2dims" | cut -d' ' -f 2)
+
+	if [[ $DEBUG ]]
+	then
+		echo "In feasible()..." >&2
+		echo "m1r: $m1r" >&2
+		echo "m1c: $m1c" >&2
+		echo "m2r: $m2r" >&2
+		echo "m2c: $m2c" >&2
+	fi
 
 	#can we add them?
-	if [ "$1" == 'a' ]
+	if [[ "$1" == 'a' ]]
 	then
 		if [[ $m1r -ne $m2r || $m1c -ne $m2c ]]
 		then
-			return 1
+			return 101
 		fi
-	elif [ "$1" == 'm' ]
+	elif [[ "$1" == 'm' ]]
 	then
 		if [[ "$m1c" -ne "$m2r" ]]
 		then
-			return 1
+			return 101
 		fi
 	else
 		echo "Wrong argument, $1, to func feasible()" >&2
-		return 1
+		return 101
 	fi
-
-	_RET=0
+	echo "$m1r $m1c $m2r $m2c"
 	return 0
 }
 
 add() 
 {
 	feasible 'a' "$1" "$2"
-	if [ "$_RET" -eq 1 ]
+	if [ "$?" -eq 101 ]
   then
 		if [ "$DEBUG" ]
 		then
-			echo "infeasible"
+			echo "infeasible" >&2
 		fi
 		_EXITCODE=$INCOMPATIBLE
 		quit
@@ -388,10 +369,10 @@ add()
   
   if [ "$DEBUG" ]
   then
-		echo "In add() after feasible..."
-	  echo "file1: $1"
-	  echo "file2: $2"
-	  echo "row_cnt: $_ROWCNT"
+		echo "In add() after feasible..." >&2
+	  echo "file1: $1" >&2
+	  echo "file2: $2" >&2
+	  echo "row_cnt: $_ROWCNT" >&2
   fi
 
   #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
@@ -432,9 +413,9 @@ add()
 			
 			if [ "$DEBUG" ]
 			then
-				echo "'mat1row$k[$q]': ${!m1r}"
-				echo "'mat2row$k[$q]': ${!m2r}"
-				echo "'mat3row$k[$q]': ${!m3r}"
+				echo "'mat1row$k[$q]': ${!m1r}" >&2
+				echo "'mat2row$k[$q]': ${!m2r}" >&2
+				echo "'mat3row$k[$q]': ${!m3r}" >&2
 			fi
 		done
 	done
@@ -457,23 +438,29 @@ add()
 
 multiply() 
 {
-	feasible 'm' "$1" "$2"
-	if [ "$_RET" -eq 1 ]
+	mmdims=$(feasible 'm' "$1" "$2")
+	if [ "$?" -eq 101 ]
   then
 		if [ "$DEBUG" ]
 		then
-			echo "infeasible"
+			echo "infeasible" >&2
 		fi
 		_EXITCODE=$INCOMPATIBLE
 		quit
   fi
-  
-  if [ "$DEBUG" ]
+	IFS=' '; read -a dimarr < <(echo "$mmdims")
+	#each index of the dimarr corresponds to a row or col dimesnion of a matrix	
+	m1r=0
+	m1c=1
+	m2r=2
+	m2c=3
+
+	if [ "$DEBUG" ]
   then
-		echo "In add() after feasible..."
-	  echo "file1: $1"
-	  echo "file2: $2"
-	  echo "row_cnt: $_ROWCNT"
+		echo "In multiply() after feasible..." >&2
+	  echo "file1: $1" >&2
+	  echo "file2: $2" >&2
+		readarray -t < <(echo "$dimarr") >&2
   fi
 
   #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
@@ -492,40 +479,50 @@ multiply()
     ((j++))
   done < "$2"
 
+	m1rows="${dimarr[$m1r]}"
+	m2rows="${dimarr[$m2r]}"
+	m2cols="${dimarr[$m2c]}"
 	#loop through the two sets of arrays and create a third
-	for (( k = 0; k < "$_ROWCNT"; k++ ))  
+	declare m1r=0
+	declare m2r=0
+	for (( x = 0; x < m1rows; x++ ))  
 	do
-		for ((q = 0; q < "$_COLCNT"; q++ ))
+		dotsum=0	
+		for (( y = 0; y < m2cols; y++ ))
 		do
-			local m1r="mat1row$k[$q]"
-			local m2r="mat2row$k[$q]"
-			#let's not overwrite our new row
-			if [ ! -v "mat3row$k" ]
-			then
-				declare -a "mat3row$k"
-				if [ "$DEBUG" ]
+			for (( z = 0; z < m2rows; z++ ))
+			do
+				m1r="mat1row$x[$z]" 
+				m2r="mat2row$z[$y]"
+				if [ ! -v "sum$x$y" ]
 				then
-					declare -p "mat3row$k"	
+					declare sum$x$y=0
 				fi
-			fi
-			m3r="mat3row$k[$q]"
-			let "mat3row$k[$q]"=${!m1r}
-			let "mat3row$k[$q]"+=${!m2r}
-			
-			if [ "$DEBUG" ]
-			then
-				echo "'mat1row$k[$q]': ${!m1r}"
-				echo "'mat2row$k[$q]': ${!m2r}"
-				echo "'mat3row$k[$q]': ${!m3r}"
-			fi
+				sum="sum$x$y"
+				
+				if [[ "$DEBUG" ]]
+				then
+					echo "First sum: $sum$x$y" >&2
+					echo "Second sum: ${!sum}" >&2
+				fi	
+				
+				tmp1=$(( ${!m1r} * ${!m2r} ))
+				let "sum$x$y"+=$(( $tmp1 ))
+				
+				if [[ "$DEBUG" ]]
+				then
+					echo "tmp1: $tmp1" >&2
+				fi
+			done
+			printf "%s\t" "${!sum}" 
 		done
-	done
-	
+		echo "" 
+	done	
 	#print out the third array
 	outline=""
-  for (( r = 0; r < "$_ROWCNT"; r++ ))
+  for (( r = 0; r < 0; r++ ))
   do
-		for (( s = 0; s < "$_ROWCNT"; s++ ))
+		for (( s = 0; s < 0; s++ ))
 		do
 			num="mat3row$r[$s]"			
 			outline+="${!num}\t"
@@ -537,6 +534,7 @@ multiply()
 	quit
 }
 
+#start by checking for proper command...
 usage 
 if [ "$SUBCMD" = "dims" ]
 then
@@ -548,6 +546,7 @@ then
     if [[ $_RET -eq 0 ]]
     then
       dims "$INFILE" 1
+			quit
     fi
   fi
 fi
@@ -586,16 +585,12 @@ then
   chk_arg_count "$2" "$3"
   if [[ "$_RET" -eq 0 ]] 
   then
-    chk_input "$2"
-    if [[ $_RET -eq 0 ]]
-	then
-		chk_input "$3"
-		if [[ $_RET -eq 0 ]]
+    chk_input "$2" "$3"
+		if [[ "$?" -eq 0 ]] 
 		then
 			add "$2" "$3"
 		fi
 	fi
-  fi
 fi
 
 if [ "$SUBCMD" = "multiply" ]
@@ -604,18 +599,13 @@ then
   chk_arg_count "$2" "$3"
   if [[ "$_RET" -eq 0 ]] 
   then
-    chk_input "$2"
-    if [[ $_RET -eq 0 ]]
-	then
-		chk_input "$3"
+    chk_input "$2" "$3"
 		if [[ $_RET -eq 0 ]]
 		then
 			multiply "$2" "$3"
 		fi
 	fi
-  fi
 fi
-
 
 #cleanup files if any leftover
 quit
