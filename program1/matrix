@@ -496,49 +496,55 @@ multiply()
     ((j++))
   done < "$2"
 
+	# I think there's a bug in bash that prevents proper evaluation of variable indices within an
+	# arithmetic context. This works around that issue.
 	m1rows="${dimarr[$m1r]}"
 	m2rows="${dimarr[$m2r]}"
 	m2cols="${dimarr[$m2c]}"
 	
 	declare m1r=0
 	declare m2r=0
+	
 	for (( x = 0; x < m1rows; x++ ))  
 	do
-		dotsum=0	
 		for (( y = 0; y < m2cols; y++ ))
 		do
+			sum=0	
 			for (( z = 0; z < m2rows; z++ ))
 			do
 				m1r="mat1row$x[$z]" 
 				m2r="mat2row$z[$y]"
-				if [ ! -v "sum$x$y" ]
-				then
-					declare sum$x$y=0
-				fi
-				sum="sum$x$y"
+				#if [ ! -v "sum$x$y" ]
+				#then
+					#declare sum$x$y=0
+				#fi
+				#sum="sum$x$y"
+				
+				tmp1="$(( ${!m1r} * ${!m2r} ))"
+				let sum+="$(( $tmp1 ))"
 				
 				if [[ "$DEBUG" ]]
 				then
-					echo "First sum: $sum$x$y" >&2
-					echo "Second sum: ${!sum}" >&2
-				fi	
-				
-				tmp1=$(( ${!m1r} * ${!m2r} ))
-				let "sum$x$y"+=$(( $tmp1 ))
-				
-				if [[ "$DEBUG" ]]
-				then
-					echo "tmp1: $tmp1" >&2
+					printf "sum+%i=%i\t" "$tmp1" "$sum" >&2
 				fi
 			done
-			if (( y == (m2cols - 1) ))
-			then
-				printf "%s" "${!sum}" 
-			else
-				printf "%s\t" "${!sum}" 
-			fi
+			#end of 3rd loop
+		if [[ "$DEBUG" ]]
+		then
+			printf "Col=%s\n" "$sum" >&2 
+		fi	
+
+		if [[ ! "$DEBUG" ]]
+		then
+				if (( y == (m2cols - 1) ))
+				then
+					printf "%s" "$sum" 
+				else
+					printf "%s\t" "$sum" 
+				fi
+		fi
 		done
-		echo "" 
+		printf "\n" 
 	done	
 	_EXITCODE=0
 	quit
