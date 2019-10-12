@@ -321,12 +321,11 @@ mean()
 feasible()
 {
 	m1dims=$( dims "$2" )
-	m1r=$(cut -d' ' -f 1 < <(echo "$m1dims"))
 	m1r=$(echo "$m1dims" | cut -d' ' -f 1)
 	m1c=$(echo "$m1dims" | cut -d' ' -f 2)
   
 	m2dims=$( dims "$3" )
-	m2r=$(echo "$m2dims" | cut -d' ' -f 2)
+	m2r=$(echo "$m2dims" | cut -d' ' -f 1)
 	m2c=$(echo "$m2dims" | cut -d' ' -f 2)
 
 	if [[ $DEBUG ]]
@@ -361,7 +360,7 @@ feasible()
 
 add() 
 {
-	feasible 'a' "$1" "$2"
+	madddims=$(feasible 'a' "$1" "$2")
 	if [ "$?" -eq 101 ]
   then
 		if [ "$DEBUG" ]
@@ -371,13 +370,19 @@ add()
 		_EXITCODE=$INCOMPATIBLE
 		quit
   fi
-  
+ 	IFS=' '; read -a dimarr < <(echo "$madddims")
+	#each index of the dimarr corresponds to a row or col dimesnion of a matrix	
+	m1r=0
+	m1c=1
+	m2r=2
+	m2c=3
+ 
   if [ "$DEBUG" ]
   then
 		echo "In add() after feasible..." >&2
 	  echo "file1: $1" >&2
 	  echo "file2: $2" >&2
-	  echo "row_cnt: $_ROWCNT" >&2
+	  echo "rows: ${dimarr[$m1r]}" >&2
   fi
 
   #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
@@ -396,10 +401,12 @@ add()
     ((j++))
   done < "$2"
 
+	mr="${dimarr[$m1r]}"
+	mc="${dimarr[$m1c]}"
 	#loop through the two sets of arrays and create a third
-	for (( k = 0; k < "$_ROWCNT"; k++ ))  
+	for (( k = 0; k < mr; k++ ))  
 	do
-		for ((q = 0; q < "$_COLCNT"; q++ ))
+		for ((q = 0; q < mc; q++ ))
 		do
 			local m1r="mat1row$k[$q]"
 			local m2r="mat2row$k[$q]"
@@ -427,12 +434,17 @@ add()
 	
 	#print out the third array
 	outline=""
-  for (( r = 0; r < "$_ROWCNT"; r++ ))
+  for (( r = 0; r < mr; r++ ))
   do
-		for (( s = 0; s < "$_ROWCNT"; s++ ))
+		for (( s = 0; s < mc; s++ ))
 		do
 			num="mat3row$r[$s]"			
-			outline+="${!num}\t"
+			if (( s == dimarr[m1c] - 1 ))
+      then
+        outline+="${!num}"
+      else
+				outline+="${!num}\t"
+      fi
 		done
 		echo -e "$outline"
 		outline=""
@@ -487,7 +499,7 @@ multiply()
 	m1rows="${dimarr[$m1r]}"
 	m2rows="${dimarr[$m2r]}"
 	m2cols="${dimarr[$m2c]}"
-	#loop through the two sets of arrays and create a third
+	
 	declare m1r=0
 	declare m2r=0
 	for (( x = 0; x < m1rows; x++ ))  
@@ -519,22 +531,15 @@ multiply()
 					echo "tmp1: $tmp1" >&2
 				fi
 			done
-			printf "%s\t" "${!sum}" 
+			if (( y == (m2cols - 1) ))
+			then
+				printf "%s" "${!sum}" 
+			else
+				printf "%s\t" "${!sum}" 
+			fi
 		done
 		echo "" 
 	done	
-	#print out the third array
-	outline=""
-  for (( r = 0; r < 0; r++ ))
-  do
-		for (( s = 0; s < 0; s++ ))
-		do
-			num="mat3row$r[$s]"			
-			outline+="${!num}\t"
-		done
-		echo -e "$outline"
-		outline=""
-	done
 	_EXITCODE=0
 	quit
 }
