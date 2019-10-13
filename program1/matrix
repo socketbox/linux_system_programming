@@ -1,7 +1,17 @@
 #!/bin/bash
-trap 'rm -f tmpfile$$ infile$$; echo "SIGINT received: Deleting temp file then exiting!"; exit 1' INT
+#
+# Author:					Casey Boettcher (boettchc)
+# Program:				matrix
+# Class:					CS344-400-F2019
+# Date:						October 12, 2019
+#
+####################################################################################################
+
+# catch ctrl-c and attempt exit 
+trap 'rm -f infile$$; echo "SIGINT received: Deleting temp file then exiting!"; exit 1' INT
+
 #exit codes
-_EXITCODE=""
+_EXITCODE=0
 #prints uasage
 BADCMD=3 
 BADARGCNT=5
@@ -10,11 +20,16 @@ BADFILEINPUT=9
 INCOMPATIBLE=11
 
 NUMARGS=$#
-SUBCMD=$1
+SUBCMD=$1 
 INFILE="infile$$"
-_RET=""
+#_RET=""
 
-# checks that SUBCMD is one of the five implemented functions
+
+# called at the beginning of the program; checks that SUBCMD is one of the five implemented functions
+# pre:	SUBCMD is set with first arg to script
+# in:		n/a
+# out:	returns 0 or _EXITCODE
+# post: n/a
 usage() 
 {
   if [ "$DEBUG" ]
@@ -26,12 +41,16 @@ usage()
     dims|transpose|mean|add|multiply) return 0;;
     *) _EXITCODE=$BADCMD && quit;;
   esac
+	return 0
 }
+
 
 # checks the number of arguments after a subcommand (dims, transpose, etc.) and cats stdin to a
 # tmp file if possible
-# in :expects that first and second args to function are the second and third args to the script
-# out: INFILE is set to a valid file
+# pre:	a valid subcommand has been issued
+# in:		expects that first and second args to function are the second and third args to the script
+# out:	returns 0 if no errors; _EXITCODE otherwise
+# post:	INFILE is set to a valid file
 chk_arg_count()
 {
   if [ "$DEBUG" ]
@@ -62,7 +81,7 @@ chk_arg_count()
 		then
 			echo "New file from stdin is readable." >&2
 		fi
-		#if args == 1, then check for incorrect subcmd
+	#if args == 1, then check for incorrect subcmd
 	elif [[ ($subargs -eq 1) && ($SUBCMD = "dims" || $SUBCMD = 'mean' || $SUBCMD = 'transpose') ]]   
 	then
 		INFILE="$1"
@@ -70,7 +89,7 @@ chk_arg_count()
 	then
 		_EXITCODE=$BADARGCNT
 		quit
-		#if args > 1, and subcmd takes only one arg, indicate that the second will be ignored
+	#if args > 1, and subcmd takes only one arg, throw an error
 	elif [[ ( $subargs -gt 1 ) && ( $SUBCMD = 'dims' || $SUBCMD = 'mean' || $SUBCMD = 'transpose' ) ]]
 	then
 		_EXITCODE=$BADARGCNT
@@ -80,18 +99,23 @@ chk_arg_count()
 		_EXITCODE=$BADARGCNT
 		quit
 	fi
-	_RET=0   
+	return 0   
 }
 
-# checks for valid file(s); assumed that this is called after chk_arg_count
-# assumes that file arguments to script are passed in to function as $1 and $2
+
+# checks args for valid file(s) 
+# pre:	chk_arg_count() and usage() have been called
+# in:		assumes that file arguments to script are passed in to function as $1 and $2
+# out:	returns 0 if no error; _EXITCODE if something goes amiss
+# post: n/a 
 chk_input() 
 {
   if [ "$DEBUG" ]
   then 
     echo -e "In chk_input()..." >&2
   fi
-  #if we're getting input from a single file...
+	
+	#if we're getting input from a single file...
   if [[ -f "$1" && -r "$1" && -s "$1" ]]
   then
     if [ "$DEBUG" ]
@@ -99,6 +123,7 @@ chk_input()
       echo "First file readable" >&2
       echo "subcmd: $SUBCMD" >&2
     fi
+		#if SUBCMD is one which only needs one file	
 		if [[ ( "$SUBCMD" = 'dims' || "$SUBCMD" != 'add' || "$SUBCMD" != 'transpose' ) ]]
     then
       return 0
@@ -111,25 +136,26 @@ chk_input()
           then
             echo "Second file readable" >&2
           fi
-          _RET=0
+          return 0
         fi
     else 
       _EXITCODE="$BADFILEINPUT" 
       quit
     fi
-  #then check if we're not getting input from stdin
   else 
-    if [ "$DEBUG" ]
-    then
-      echo "Can't read file created from stdinput" >&2
-      echo INFILE: "$INFILE" >&2
-      cat "$INFILE"
-    fi
-    _EXITCODE="$BADFILEINPUT" 
+		_EXITCODE="$BADFILEINPUT" 
     quit
   fi
+	return 0
 }
 
+
+# Exits program gracefully by printing error to stderr, removing any temporary files, and setting
+# non-zero exit code
+# pre:		_EXITCODE is set
+# in:			n/a
+# out:		_EXITCODE and accompanying error message, if applicable
+# post:		execution terminated
 quit() 
 {
   if [ "$DEBUG" ]
@@ -150,13 +176,17 @@ quit()
 		*);;
   esac
   #clean up tmp files
-  rm -f "tmpfile$$" "infile$$" 
+  rm -f "infile$$" 
   exit $_EXITCODE
 }
 
-# expects two arguments, one the input file, and a second, numeric flag that is used for internal
-# ...calls from other scripts that should not produce output
-#out: row and col of the matrix provided, separated by a space
+
+# gives the dimensions of a matrix in "row col" format
+# pre:		file input verified	
+# in:			a file argument containing a matrix
+# out:		prints the dimensions ("row col") of the matrix and returns 0 on success; 
+#					_EXITCODE and accompanying error message, if fail
+# post:		n/a	
 dims() 
 {
   local col_cnt
@@ -179,8 +209,16 @@ dims()
 	return 0
 }
 
+
+# transposes an MxN array to an NxM array
+# pre:		file input verified	
+# in:			a file argument containing a matrix
+# out:		prints the transposed matrix, row by row, each column tab-delimited and each row ending 
+#					in a newline; returns 0 or _EXITCODE and accompanying error message if fail
+# post:		n/a	
 transpose() 
 {
+	# get the dimensions of the array
 	dimsout=$(dims "$1")
 	row_cnt=$(echo "$dimsout" | cut -d' ' -f 1)
 	col_cnt=$(echo "$dimsout" | cut -d' ' -f 2)
@@ -196,7 +234,7 @@ transpose()
   while IFS=$'\n' read -r line
   do
     IFS=$'\t'; read -ra rowarr$i < <(printf "%s" "$line")
-		if [ $DEBUG ]
+		if [[ "$DEBUG" ]]
 		then
 			declare -p "rowarr$i"
 		fi
@@ -204,42 +242,44 @@ transpose()
   done < "$1"
 
   #for each column we create a string that will represent a row
-  for (( c = 0; c < $row_cnt; c++ ))
+  for (( c = 0; c < "$row_cnt"; c++ ))
   do
-    var="rowarr$c[@]"
-    #avoid printing a trailing tab
-    g=`expr $row_cnt - 1`
-    for (( z = 0; z < $col_cnt; z++ ))
+    for (( z = 0; z < "$col_cnt"; z++ ))
     do
+			#this is our reference to the old matrix; an intermediate variable is used for indirect
+			#...reference expansion, a technique seemingly essential to array manipulation in bash
       nr="rowarr$c[$z]"
+			#here we create one variable per new matrix column
       if [ -z "newrow$z" ]
       then
         declare "newrow$z"=""
       fi
-      if [ "$c" -eq "$g" ]
+			#avoid printing a trailing tab
+			if (( c == (row_cnt - 1) ))
       then
         eval "newrow$z"+="${!nr}"
       else
         eval "newrow$z"+="${!nr}$'\t'"
       fi
-      #echo $"newrow$z" #printf -v "newrow$c" "%s" "$e$'\t'"
-      #declare -p "newrow$z"
-      #"${!nr}"="$e"
-      #printf -v "${!nr}" "%s" "foo"
-      #printf -v "${!nr}" "%s" "$e\t"
-      #${!nr} ="${!nr}\t$e"
     done
   done
-  for (( p = 0; p < "$col_cnt"; p++ ))
+	
+	#print each of the strings that represents a row in the transposed matrix
+	for (( p = 0; p < "$col_cnt"; p++ ))
   do
-    out="newrow$p"
+		#again, we use indirect reference expansion to get at the value of the "generated" variable 
+		out="newrow$p"
     echo "${!out}"
   done
-	_EXITCODE=0
-	quit
+	return 0
 }
 
+
 # takes a numerator and denominator, divides and rounds the quotient
+# pre:		n/a
+# in:			two signed integers, a numerator and a denominator, respectively
+# out:	  prints the rounded quotient of the arguments on stdout and returns 0	
+# post:		n/a	
 mean_round()
 {
 	#follows the formula: (a + (b/2)*( (a>0)*2-1 )) / b
@@ -262,8 +302,15 @@ mean_round()
 	_RET="$quot"
 }
 
+
+# finds the mean value of each column of an integer matrix
+# pre:		n/a
+# in:			a matrix
+# out:	  prints the average of each column of a matrix, each mean delimited by a tab
+# post:		n/a
 mean() 
 {
+	# get the dimensions of the matrix argument
 	dimsout=$(dims "$1")
 	row_cnt=$(echo "$dimsout" | cut -d' ' -f 1)
 	col_cnt=$(echo "$dimsout" | cut -d' ' -f 2)
@@ -281,43 +328,44 @@ mean()
     ((i++))
   done < "$1"
 
-  #for each column we create a sum that will be an element in our 1D output
-  for (( c = 0; c < "$row_cnt"; c++ ))
+	#declare an array to hold the means
+	means=()
+	
+	# loop through the matrix argument
+	for (( c = 0; c < "$row_cnt"; c++ ))
   do
-    var="rowarr$c[@]"
-    #avoid printing a trailing tab
-    g=`expr $row_cnt - 1`
     for (( z = 0; z < "$col_cnt"; z++ ))
     do
+			# a temporary variable for indirect reference 
       nr="rowarr$c[$z]"
-      #let's not overwrite our per-column val 
-      if [ -z "sum$z" ]
-      then
-        declare -i "sum$z"=0
-      fi
-      let "sum$z"+=${!nr}
-    done
+			let means[z]+=${!nr} 
+		done
   done
-  outline=""
-  for (( p = 0; p < "$col_cnt"; p++ ))
-  do
-		num="sum$p"
-		mean_round ${!num} "$row_cnt"
-		if (( p == (col_cnt - 1) ))
+
+	# print our array of means out
+	for (( m = 0; m < "$col_cnt"; m++ ))
+	do
+		mean_round ${means[m]} "$row_cnt"
+		if (( m == (col_cnt - 1) ))
 		then
-			eval outline+="$_RET"
+			printf "%i\n" "$_RET"
 		else
-			eval outline+="$_RET$'\t'"
+			printf "%i\t" "$_RET"
 		fi
-  done
-  echo -e "$outline"
-	_EXITCODE=0
+	done
+
+	return 0	
 	quit
 }
 
-#in 1: 'a' or 'm', to check whether the two matrices can be feasibly added or mulitplied
-#in 2 and 3: the two matrices in question
-#out: the dimensions of both matrices, "row1 col1 row2 col2", 101 if infeasible
+
+# given two matrices, checks whether add or multiply is a feasible operation
+# pre:		n/a
+# in 1:		'a' or 'm', to check whether the two matrices can be feasibly added or mulitplied
+# in 2:		one of two matrices 
+# in 3:		a second matrix
+# out:		the dimensions of both matrices, "row1 col1 row2 col2"; returns 0 if matrices feasible
+# post:		upon failure, _EXITCODE is set to $INCOMPATIBLE 
 feasible()
 {
 	m1dims=$( dims "$2" )
@@ -342,31 +390,39 @@ feasible()
 	then
 		if [[ $m1r -ne $m2r || $m1c -ne $m2c ]]
 		then
-			return 101
+			_EXITCODE=$INCOMPATBLE	
+			return "$_EXITCODE"
 		fi
 	elif [[ "$1" == 'm' ]]
 	then
 		if [[ "$m1c" -ne "$m2r" ]]
 		then
-			return 101
+			_EXITCODE=$INCOMPATBLE	
+			return "$_EXITCODE"
 		fi
 	else
 		echo "Wrong argument, $1, to func feasible()" >&2
-		return 101
+		_EXITCODE=$INCOMPATBLE	
+		return "$_EXITCODE"
 	fi
 	echo "$m1r $m1c $m2r $m2c"
 	return 0
 }
 
+
+# add two matrices, element-wise, such that a third matrix of the same dimensions is created, which
+#					...consists of the sums of the two arguments
+# pre:		n/a
+# in:			two matrices of equivalent dimensions	
+# out:		a third matrix, consisting of tab-delimited sums,	printed to stdout
+# post:		n/a
+# 
 add() 
 {
+	# check if matrices can be added	
 	madddims=$(feasible 'a' "$1" "$2")
-	if [ "$?" -eq 101 ]
-  then
-		if [ "$DEBUG" ]
-		then
-			echo "infeasible" >&2
-		fi
+	if [[ "$?" -ne 0 ]]
+	then	
 		_EXITCODE=$INCOMPATIBLE
 		quit
   fi
@@ -385,24 +441,28 @@ add()
 	  echo "rows: ${dimarr[$m1r]}" >&2
   fi
 
-  #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
+  #the following gets us an array for each line of the file; each array is named rowarr<n>  
   i=0
-  while IFS=$'\n' read -r line
+  while IFS=$'\n' read -r -u 3 oneline && IFS=$'\n' read -r -u 4 twoline
   do
-    IFS=$'\t'; read -ra mat1row$i < <(printf "%s" "$line")
+    IFS=$'\t'; read -ra mat1row$i < <(printf "%s" "$oneline")
+    IFS=$'\t'; read -ra mat2row$i < <(printf "%s" "$twoline")
     ((i++))
-  done < "$1"
+  done 3<"$1" 4<"$2"
 
-	#get a set of arrays for the second matrix
-  j=0
-  while IFS=$'\n' read -r line
-  do
-    IFS=$'\t'; read -ra mat2row$j < <(printf "%s" "$line")
-    ((j++))
-  done < "$2"
+	#close descriptors
+	3<&-
+	4<&-
+	
+	echo "TEST############"
+	if    command >&3
+	then  echo 3 is open >&3
+	else  ! echo 3 is not open
+	fi    2<>/dev/null
 
 	mr="${dimarr[$m1r]}"
 	mc="${dimarr[$m1c]}"
+	
 	#loop through the two sets of arrays and create a third
 	for (( k = 0; k < mr; k++ ))  
 	do
@@ -449,19 +509,14 @@ add()
 		echo -e "$outline"
 		outline=""
 	done
-	_EXITCODE=0
-	quit
+	return 0
 }
 
 multiply() 
 {
 	mmdims=$(feasible 'm' "$1" "$2")
-	if [ "$?" -eq 101 ]
-  then
-		if [ "$DEBUG" ]
-		then
-			echo "infeasible" >&2
-		fi
+	if [[ "$?" -ne 0 ]]
+	then
 		_EXITCODE=$INCOMPATIBLE
 		quit
   fi
@@ -550,13 +605,14 @@ multiply()
 	quit
 }
 
+
 #start by checking for proper command...
 usage 
 if [ "$SUBCMD" = "dims" ]
 then
   #dims only takes one argument
   chk_arg_count "$2"
-  if [[ $_RET -eq 0 ]]
+  if [[ "$?" -eq 0 ]]
   then
     chk_input "$INFILE"
     if [[ $_RET -eq 0 ]]
@@ -571,7 +627,7 @@ if [ "$SUBCMD" = "transpose" ]
 then
   #transpose only takes one argument
   chk_arg_count "$2"
-  if [[ $_RET -eq 0 ]]
+  if [[ "$?" -eq 0 ]]
   then
     chk_input "$INFILE"
     if [[ $_RET -eq 0 ]]
@@ -585,7 +641,7 @@ if [ "$SUBCMD" = "mean" ]
 then
   #mean takes one argument
   chk_arg_count "$2"
-  if [[ $_RET -eq 0 ]]
+  if [[ "$?" -eq 0 ]]
   then
     chk_input "$INFILE"
     if [[ $_RET -eq 0 ]]
@@ -599,7 +655,7 @@ if [ "$SUBCMD" = "add" ]
 then
   #add takes two arguments
   chk_arg_count "$2" "$3"
-  if [[ "$_RET" -eq 0 ]] 
+  if [[ "$?" -eq 0 ]] 
   then
     chk_input "$2" "$3"
 		if [[ "$?" -eq 0 ]] 
@@ -613,7 +669,7 @@ if [ "$SUBCMD" = "multiply" ]
 then
   #add takes two arguments
   chk_arg_count "$2" "$3"
-  if [[ "$_RET" -eq 0 ]] 
+  if [[ "$?" -eq 0 ]] 
   then
     chk_input "$2" "$3"
 		if [[ $_RET -eq 0 ]]
