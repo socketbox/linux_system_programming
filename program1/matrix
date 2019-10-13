@@ -428,45 +428,30 @@ add()
   fi
  	IFS=' '; read -a dimarr < <(echo "$madddims")
 	#each index of the dimarr corresponds to a row or col dimesnion of a matrix	
-	m1r=0
-	m1c=1
-	m2r=2
-	m2c=3
+	oner=0
+	onec=1
  
   if [ "$DEBUG" ]
   then
 		echo "In add() after feasible..." >&2
 	  echo "file1: $1" >&2
 	  echo "file2: $2" >&2
-	  echo "rows: ${dimarr[$m1r]}" >&2
+	  echo "rows: ${dimarr[$oner]}" >&2
   fi
 
-  #the following gets us an array for each line of the file; each array is named rowarr<n>  
+  #the following gets us an array for each line of each file; each array is named rowarr<n>  
   i=0
   while IFS=$'\n' read -r -u 3 oneline && IFS=$'\n' read -r -u 4 twoline
   do
     IFS=$'\t'; read -ra mat1row$i < <(printf "%s" "$oneline")
     IFS=$'\t'; read -ra mat2row$i < <(printf "%s" "$twoline")
     ((i++))
-  done 3<"$1" 4<"$2"
+	done 3<"$1" 4<"$2"
 
-	#close descriptors
-	3<&-
-	4<&-
-	
-	echo "TEST############"
-	if    command >&3
-	then  echo 3 is open >&3
-	else  ! echo 3 is not open
-	fi    2<>/dev/null
-
-	mr="${dimarr[$m1r]}"
-	mc="${dimarr[$m1c]}"
-	
-	#loop through the two sets of arrays and create a third
-	for (( k = 0; k < mr; k++ ))  
+	#loop through the two sets of arrays, printing output as we go
+	for (( k = 0; k < dimarr[oner]; k++ ))  
 	do
-		for ((q = 0; q < mc; q++ ))
+		for ((q = 0; q < dimarr[onec]; q++ ))
 		do
 			local m1r="mat1row$k[$q]"
 			local m2r="mat2row$k[$q]"
@@ -479,41 +464,35 @@ add()
 					declare -p "mat3row$k"	
 				fi
 			fi
-			m3r="mat3row$k[$q]"
-			let "mat3row$k[$q]"=${!m1r}
-			let "mat3row$k[$q]"+=${!m2r}
+		
+			#sum the elements
+			let sum+="${!m1r}+${!m2r}"
 			
-			if [ "$DEBUG" ]
-			then
-				echo "'mat1row$k[$q]': ${!m1r}" >&2
-				echo "'mat2row$k[$q]': ${!m2r}" >&2
-				echo "'mat3row$k[$q]': ${!m3r}" >&2
-			fi
-		done
-	done
-	
-	#print out the third array
-	outline=""
-  for (( r = 0; r < mr; r++ ))
-  do
-		for (( s = 0; s < mc; s++ ))
-		do
-			num="mat3row$r[$s]"			
-			if (( s == dimarr[m1c] - 1 ))
+			#print	
+			if (( q == dimarr[onec] - 1 ))
       then
-        outline+="${!num}"
+				printf "%i\n" $sum
       else
-				outline+="${!num}\t"
+				printf "%i\t" $sum
       fi
+
+			#zero-out the sum	
+			sum=0	
 		done
-		echo -e "$outline"
-		outline=""
 	done
 	return 0
 }
 
+
+# multiply two matrices, MxN and NxP, such that a new matrix, MxP, is formed from their dot products
+#					...consists of the sums of the two arguments
+# pre:		n/a
+# in:			two matrices of equivalent dimensions	
+# out:		a third matrix, consisting of tab-delimited dot products,	printed to stdout
+# post:		n/a
 multiply() 
 {
+	# are the tow matrices suitable for this operation?
 	mmdims=$(feasible 'm' "$1" "$2")
 	if [[ "$?" -ne 0 ]]
 	then
@@ -522,11 +501,10 @@ multiply()
   fi
 	IFS=' '; read -a dimarr < <(echo "$mmdims")
 	#each index of the dimarr corresponds to a row or col dimesnion of a matrix	
-	m1r=0
-	m1c=1
-	m2r=2
-	m2c=3
-
+	monerow=0
+	mtworow=2
+	mtwocol=3
+	
 	if [ "$DEBUG" ]
   then
 		echo "In multiply() after feasible..." >&2
@@ -535,74 +513,59 @@ multiply()
 		readarray -t < <(echo "$dimarr") >&2
   fi
 
-  #the following gets us a 1D array for each line of the file; each array is named rowarr<n>  
-  i=0
-  while IFS=$'\n' read -r line
-  do
-    IFS=$'\t'; read -ra mat1row$i < <(printf "%s" "$line")
-    ((i++))
-  done < "$1"
-
-	#get a set of arrays for the second matrix
-  j=0
-  while IFS=$'\n' read -r line
-  do
-    IFS=$'\t'; read -ra mat2row$j < <(printf "%s" "$line")
-    ((j++))
-  done < "$2"
-
-	# I think there's a bug in bash that prevents proper evaluation of variable indices within an
-	# arithmetic context. This works around that issue.
-	m1rows="${dimarr[$m1r]}"
-	m2rows="${dimarr[$m2r]}"
-	m2cols="${dimarr[$m2c]}"
-	
-	declare m1r=0
-	declare m2r=0
-	
-	for (( x = 0; x < m1rows; x++ ))  
+	# read first matrix in
+	i=0
+	while IFS=$'\n' read -r line
 	do
-		for (( y = 0; y < m2cols; y++ ))
+		IFS=$'\t'; read -ra mat1row$i < <(printf "%s" "$line")
+		((i++))
+	done < "$1"  
+
+	# read second matrix in
+	j=0
+	while IFS=$'\n' read -r line
+	do
+		IFS=$'\t'; read -ra mat2row$j < <(printf "%s" "$line")
+		((j++))
+	done < "$2"  
+
+
+	# calculate sum from dot product and write to stdout
+	for (( x = 0; x < dimarr[monerow]; x++ ))  
+	do
+		for (( y = 0; y < dimarr[mtwocol]; y++ ))
 		do
 			sum=0	
-			for (( z = 0; z < m2rows; z++ ))
+			for (( z = 0; z < dimarr[mtworow]; z++ ))
 			do
-				m1r="mat1row$x[$z]" 
-				m2r="mat2row$z[$y]"
-				#if [ ! -v "sum$x$y" ]
-				#then
-					#declare sum$x$y=0
-				#fi
-				#sum="sum$x$y"
+				#again, this indirection seems necessary
+				matoner="mat1row$x[$z]" 
+				mattwor="mat2row$z[$y]"
 				
-				tmp1="$(( ${!m1r} * ${!m2r} ))"
+				tmp1=$(( ${!matoner} * ${!mattwor} ))
 				let sum+="$(( $tmp1 ))"
 				
 				if [[ "$DEBUG" ]]
 				then
 					printf "sum+%i=%i\t" "$tmp1" "$sum" >&2
 				fi
+			
 			done
 			#end of 3rd loop
-		if [[ "$DEBUG" ]]
-		then
-			printf "Col=%s\n" "$sum" >&2 
-		fi	
+			if [[ "$DEBUG" ]]
+			then
+				printf "Col=%s\n" "$sum" >&2 
+			fi	
 
-		if [[ ! "$DEBUG" ]]
-		then
-				if (( y == (m2cols - 1) ))
-				then
-					printf "%s" "$sum" 
-				else
-					printf "%s\t" "$sum" 
-				fi
-		fi
+			if (( y == ( dimarr[mtwocol] - 1 ) ))
+			then
+					printf "%i\n" "$sum" 
+			else
+					printf "%i\t" "$sum" 
+			fi
 		done
-		printf "\n" 
 	done	
-	_EXITCODE=0
-	quit
+	return 0
 }
 
 
