@@ -8,7 +8,7 @@
 ####################################################################################################
 
 # catch ctrl-c and attempt exit 
-trap 'rm -f infile$$; echo "SIGINT received: Deleting temp file then exiting!"; exit 1' INT
+trap 'rm -f infile$$; echo "SIGINT received: Deleting temp file then exiting!" >&2; exit 1' INT
 
 #exit codes
 _EXITCODE=0
