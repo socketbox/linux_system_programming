@@ -1,0 +1,10 @@
+#!/bin/bash
+#cannot use math library
+#gcc -ansi -lm -Wall -pedantic -g -o boettchc.buildrooms ./boettchc.buildrooms.c
+if [[ $1 = "DEBUG" ]]
+then
+	gcc -std=gnu89 -Wall -DDEBUG=1 -g -o boettchc.buildrooms ./boettchc.buildrooms.c -lpthread
+elif [[ $1 = "PROD" ]]
+then
+	gcc -o boettchc.buildrooms ./boettchc.buildrooms.c -lpthread
+fi
