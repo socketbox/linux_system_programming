@@ -4,9 +4,13 @@
 #include <string.h>
 #include <time.h>
 
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+
 /*
  * generates an unsigned int between low and high, inclusive of both
- * taken from: https://en.cppreference.com/w/c/numeric/random/rand
+ * taken from: http://www.pcg-random.org/posts/bounded-rands.html
  *
  * pre:   srand has been called to seed the PRNG
  * in:    low and high integer values
@@ -15,9 +19,33 @@
  */
 int get_rand( unsigned int low, unsigned int high)
 {
-  int r = rand();
-  r = low + ( r / ( (RAND_MAX + 1u) / (high + 1) ) );
-  return r;
+  unsigned int range = high - low + 1;
+  int r, t;
+  r = t = -1;
+  do
+  {
+    r = rand();
+    t = r % range;
+  }
+  while( r - t > (-range));
+  return t + low;
+    
+  /*
+   * unbiased div approach
+   *
+  int t = -1;
+  unsigned int range = high - low + 1;
+  unsigned int div = ((-range)/range) + 1;
+  int r = rand(); 
+  if (div == 0)
+    t = 0;
+  while(t > range)
+  {
+    r = rand();
+    t = r/div;
+  }
+  return low + t;
+  */
 }
 
 //checks the distribution of a billion randomly generated numbers
@@ -38,6 +66,7 @@ int main( int argc, char **args )
   unsigned long its = atol( *(args+3) );
 
   printf("Applicable limits on this system:\n");
+  printf("RAND_MAX: %i\n", RAND_MAX); 
   printf("INT_MAX: %i\n", INT_MAX); 
   printf("LONG_MAX: %lu\n", LONG_MAX); 
 
@@ -45,8 +74,12 @@ int main( int argc, char **args )
   //char  foo = ( (*(args+3))[3] );
   //printf("This is foo: %c", foo);
 
-  int counts[high-low+1];
-  memset(counts, 0, (sizeof(int)*high));
+  //array to tally the times a specific int value is generated
+  int len = high-low+1; 
+  if(DEBUG)
+    printf("range is %i\n", len);
+  int counts[len];
+  memset(counts, 0, (sizeof(int)*len));
   //seed the PRNG
   srand(time(NULL));
 
@@ -54,12 +87,14 @@ int main( int argc, char **args )
   for(int n = 0; n < its; n++)
   {
     x = get_rand(low, high);
-    counts[x+low]++; 
+    if(DEBUG)
+      printf("iter %i: %i\n", n, x);
+    counts[x-low]++; 
   }
 
   double p = .0;
 
-  for (int j = 0; j < high; j++)
+  for (int j = 0; j < len; j++)
   {
     printf("Count %i: %i\n", j, counts[j]);
     p = counts[j]/(its+.0);

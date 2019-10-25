@@ -10,14 +10,16 @@
 #endif
 
 #define ROOM_CNT 7
+#define NAME_LEN 9
 #define ONID "boettchc\0"
 #define ROOMS "rooms\0"
 
-enum rm_type { START_ROOM, MID_ROOM, END_ROOM };
+enum RM_TYPE { START_ROOM, MID_ROOM, END_ROOM };
+char *ROOM_TYPES[] = { "START_ROOM", "MID_ROOM", "END_ROOM" };
 
 typedef struct room
 {
-  char *rm_name;
+  char rm_name[NAME_LEN];
   int rm_number;
   int rm_type;
   int cx_count;
@@ -27,18 +29,26 @@ typedef struct room
 
 /*
  * generates an unsigned int between low and high, inclusive of both
- * taken from: https://en.cppreference.com/w/c/numeric/random/rand
+ * taken from: http://www.pcg-random.org/posts/bounded-rands.html
  *
  * pre:   srand has been called to seed the PRNG
  * in:    low and high integer values
  * out:   a random, unsigned integer between low and high, inclusive
  * post:  n/a
  */
-int get_rand( unsigned int low, unsigned int high)
-{
-  int r = rand();
-  r = low + ( r / ( (RAND_MAX + 1u) / (high + 1) ) );
-  return r;
+int get_rand( unsigned int low, unsigned int high) 
+{                                                  
+  unsigned int range = high - low + 1;             
+  int r, t;                                        
+  r = t = -1;                                      
+  do                                               
+  {                                                
+    r = rand();                                    
+    t = r % range;                                 
+  }                                                
+  //use overflow trick to calculate with a full 2^32
+  while( r - t > (-range));                        
+  return t + low;                                  
 }
 
 
@@ -96,37 +106,26 @@ void mk_rm_dir(pid_t pid)
 }
 
 
-char* get_rm_name(char *names[])
+void get_rm_name(char *names[], Room *rm)
 {
-  int idx = get_rand(0, sizeof(names));
-  char *n = names[idx];
-  if(DEBUG)
-    printf("get room name: %s" n);
-  return n;
-}
-
-
-Room* gen_rooms(int count, char *names[])
-{
-  Room *rooms = malloc(count*sizeof(Room));
-
-  char *name = NULL;
-
-  for(int i = 0; i < count; i++)
+  int idx = -1;
+  memset(rm->rm_name, '\0', NAME_LEN);
+  
+  do
   {
-    if(i = 0)
-      type = START_ROOM;
-    else if (i = 1)
-      type = END_ROOM;
-    else
-      type = MID_ROOM;
-
-    name = get_rm_name(names);       
+    idx = get_rand(0, sizeof(names));
+    if(names[idx] != NULL)
+    {
+      strcpy(rm->rm_name, names[idx]);
+      names[idx]=NULL;
+    }
   }
-
-  return rooms;
+  while(rm->rm_name[0] == '\0');
+  
+  if(DEBUG)
+    printf("get room name: %s\n", rm->rm_name);
+ 
 }
-
 
 
 /*
@@ -148,6 +147,86 @@ int are_connected(Room rm1, Room rm2)
 }
 
 
+void connect_rooms( Room *rm )
+{
+  int cx_count = -1;
+  int rm_cx = -1;
+
+  //alias for convenience
+  Room *rmi;
+  
+  //for each room...
+  int i=0; 
+  for(; i<ROOM_CNT; i++)
+  {
+    rmi = (rm+i);
+    
+    //each room to have between 3 and 6 outside connections
+    cx_count = get_rand(3, 6);
+
+    //connect the room to itself
+    rm->cxs = rm->cxs | powi(2, rm->rm_number);
+
+    //...given a random number of connections, decide... 
+    int c=0; 
+    for(; c<cx_count; c++)
+    {
+      do
+      {
+        //...which rooms to connect
+        rm_cx = get_rand(0, ROOM_CNT-1);
+      }
+      //keep trying if we generate a room number equivalent to our own
+      while(rm_cx == (rm+i)->rm_number);
+
+      //make the two-way connection 
+      rmi->cxs = rmi->cxs | powi(2, rm_cx);
+      (rm+rm_cx)->cxs = (rm+rm_cx)->cxs | powi(2, i);
+    }
+    
+    if(DEBUG)
+      printf("cxs for room %i: %c", i, rm->cxs);
+  }
+}
+
+
+Room* gen_rooms(int count, char *names[])
+{
+  Room *rooms = malloc(count*sizeof(Room));
+  
+  int type = -1;
+
+  int i = 0;
+  for(; i < count; i++)
+  {
+    //rm_number allows us to do array index and room connection bit mask tricks 
+    rooms[i].rm_number = i;
+
+    /* 
+     * pointless in randomizing room type assignment, since what defines a room in the user's
+     * eyes is its name and connections 
+     */
+    if(i == 0)
+      type = START_ROOM;
+    else if (i == 1)
+      type = END_ROOM;
+    else
+      type = MID_ROOM;
+
+    rooms[i].rm_type = type;
+
+    //set the connections bitmask
+    rooms[i].cxs = '\x00';
+
+    get_rm_name(names, &rooms[i]);       
+    
+  }
+
+  return rooms;
+}
+
+
+
 int main( int argc, char **args )
 {
   /* Declare and init an array of ten room labels */
@@ -163,8 +242,10 @@ int main( int argc, char **args )
   srand(time(NULL));
   
   /* make an $ONID.rooms.$PID directory */
-  Room *rooms = gen_rooms(ROOM_CNT);  
+  Room *rooms = gen_rooms(ROOM_CNT, ten_rooms);  
 
+  connect_rooms( rooms ); 
+  
   free(rooms);
   rooms = NULL;
   return 0;
