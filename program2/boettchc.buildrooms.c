@@ -351,6 +351,8 @@ int main( int argc, char **args )
 
   mk_room_files(rooms, dir_name);
 
+  free(dir_name);
+  dir_name = NULL;
   free(rooms);
   rooms = NULL;
   return 0;

@@ -3,8 +3,10 @@
 #gcc -ansi -lm -Wall -pedantic -g -o boettchc.buildrooms ./boettchc.buildrooms.c
 if [[ $1 = "DEBUG" ]]
 then
-	gcc -Wall -DDEBUG=1 -ggdb3 -o boettchc.buildrooms ./boettchc.buildrooms.c -lpthread
+	gcc -Wall -DDEBUG=1 -ggdb3 -o boettchc.buildrooms ./boettchc.buildrooms.c
+	gcc -Wall -DDEBUG=1 -ggdb3 -o boettchc.adventure ./boettchc.adventure.c -lpthread
 elif [[ $1 = "PROD" ]]
 then
-	gcc -o boettchc.buildrooms ./boettchc.buildrooms.c -lpthread
+	gcc -o boettchc.buildrooms ./boettchc.buildrooms.c 
+	gcc -o boettchc.adventure ./boettchc.adventure.c -lpthread
 fi
