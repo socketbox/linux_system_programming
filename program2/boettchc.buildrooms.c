@@ -185,7 +185,7 @@ void mk_room_files(Room *rm, char *dir)
   int path_len = strlen(dir) + 1 + NAME_LEN + 5;
   //allocate mem for pathname and zero it out 
   char *fn;
-  //our filed descriptor
+  //our file descriptor
   int fd = -1;
   int i = 0; 
   for(; i<ROOM_CNT; i++)
@@ -332,7 +332,7 @@ Room* gen_rooms(int count, char *names[])
 int main( int argc, char **args )
 {
   /* Declare and init an array of ten room labels */
-  char *ten_rooms[] = {"BC", "Alberta", "Saskatch", "Manitoba", "Ontario", "Quebec", "NewfLab", "NewBrun", "NovaScot", "PrinceEd"};
+  char *ten_rooms[] = {"BritCol", "Alberta", "Saskatch", "Manitoba", "Ontario", "Quebec", "NewfLab", "NewBrun", "NovaScot", "PrinceEd"};
  
   /* get the PID */
   pid_t pid = getpid();
