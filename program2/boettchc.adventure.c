@@ -335,6 +335,8 @@ int get_hash(char *name)
         }
       }
   }
+  if(DEBUG)
+    fprintf(stderr, "Retval from parse_file is %i for room %s.\n", retval, nodearr[hash_idx].rm_name);
   return retval;
 }
 
@@ -400,7 +402,7 @@ int process_room_files(const char * const dirname, Node nodes[])
           {
             fprintf(stderr, "In process_room_files...\nRoom %s has start_hash of %i\n", rmf->d_name, start_hash);
           }
-          if(start_hash == -2) 
+          if(start_hash == -2 && pfres == -2) 
           {
             fprintf(stderr, "Failed to parse file: %s; Error: %s\n", rmf->d_name, strerror(errno));
             fclose(f);
@@ -449,7 +451,9 @@ void end(Node nodes[], int hash_route[], int steps)
   //tmp var for node
   Node *n = NULL;
   int s; 
-  for(s = 0; s <= steps; s++)
+
+  //end path list starts from room resulting from first step, not START
+  for(s = 1; s <= steps; s++)
   {
     n = get_node_for_hash(hash_route[s], nodes);
     fprintf(stdout, "%s\n", n->rm_name);
@@ -723,6 +727,7 @@ int main()
         break;
       case 'h':
         fprintf(stdout, "\n%s\n", HUH);
+        fflush(stdout);
         break; 
     }
   }

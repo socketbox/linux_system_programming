@@ -1,13 +1,20 @@
 #!/bin/bash
 #cannot use math library
 #gcc -ansi -lm -Wall -pedantic -g -o boettchc.buildrooms ./boettchc.buildrooms.c
-if [[ ($1 = "DEBUG") || ($1 = '') ]]
+if [[ ($1 = "DEBUG") ]] #|| ($1 = '') ]]
 then
 	echo "DEBUG profile"
+	rm -f ./boettchc.buildrooms ./boettchc.adventure
 	gcc -Wall -DDEBUG=1 -ggdb3 -std=gnu89 -o boettchc.buildrooms ./boettchc.buildrooms.c
 	gcc -Wall -DDEBUG=1 -ggdb3 -std=gnu89 -o boettchc.adventure ./boettchc.adventure.c -lpthread
 elif [[ $1 = "PROD" ]]
 then
+	echo "PROD profile"
+	rm -f ./boettchc.buildrooms ./boettchc.adventure
 	gcc -o boettchc.buildrooms ./boettchc.buildrooms.c 
 	gcc -o boettchc.adventure ./boettchc.adventure.c -lpthread
+else
+	gcc -Wall -ggdb3 -std=gnu89 -o boettchc.buildrooms ./boettchc.buildrooms.c
+	gcc -Wall -ggdb3 -std=gnu89 -o boettchc.adventure ./boettchc.adventure.c -lpthread
+
 fi
