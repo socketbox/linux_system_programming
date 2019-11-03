@@ -491,6 +491,31 @@ void route_user(Usrin *u, Node **current, Node nodes[], int hash_route[], int *s
 }
 
 
+/*
+ * generates an unsigned int between low and high, inclusive of both
+ * taken from: http://www.pcg-random.org/posts/bounded-rands.html
+ *
+ * pre:   srand has been called to seed the PRNG
+ * in:    low and high integer values
+ * out:   a random, unsigned integer between low and high, inclusive
+ * post:  n/a
+ */
+int get_rand( unsigned int low, unsigned int high) 
+{                                                  
+  unsigned int range = high - low + 1;             
+  int r, t;                                        
+  r = t = -1;                                      
+  do                                               
+  {                                                
+    r = rand();                                    
+    t = r % range;                                 
+  }                                                
+  //use overflow trick to calculate with a full 2^32
+  while( r - t > (-range));                        
+  return t + low;                                  
+}
+
+
 void display_node(Node *n)
 {
   //at start of game, do not precede display of node with newline
@@ -500,16 +525,25 @@ void display_node(Node *n)
     fprintf(stdout, "\n%s", CURR_LOC);
   
   fprintf(stdout, "%s\n", n->rm_name);
- 
-  //iterate over connection names 
+
   fprintf(stdout, POSS_CONN);
-  int x;
+  //randomize display of connections and track those already selected
+  int slctd[6] = {0};
+  int x, y = 0;
   for(x=0; x < n->cx_cnt; x++)
-  { //check to see is we need a comma
+  { 
+    do
+    {
+      y = get_rand(0, n->cx_cnt-1);
+    }
+    while( slctd[y] == 1 );
+    slctd[y] = 1;
+    
+    //check to see if we need a comma
     if(x != (n->cx_cnt)-1)
-      fprintf(stdout, "%s, ", n->cxs[x]); 
+      fprintf(stdout, "%s, ", n->cxs[y]); 
     else
-      fprintf(stdout, "%s.\n", n->cxs[x]); 
+      fprintf(stdout, "%s.\n", n->cxs[y]); 
   }
 
   //where to prompt

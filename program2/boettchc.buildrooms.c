@@ -12,10 +12,12 @@
 #define DEBUG 0
 #endif
 
-#define ROOM_CNT 7
-#define NAME_LEN 9
-#define ONID "boettchc\0"
-#define ROOMS "rooms\0"
+#define ROOM_CNT        7
+#define NAME_LEN        9
+#define ONID            "boettchc\0"
+#define ROOMS           "rooms\0"
+#define PID_MAX_LEN     5
+
 
 enum RM_TYPE { START_ROOM, MID_ROOM, END_ROOM };
 char *ROOM_TYPES[] = { "START_ROOM", "MID_ROOM", "END_ROOM" };
@@ -93,7 +95,7 @@ void mk_room_dir(pid_t pid, char **dir_name)
 {
   char *delim = ".";
   /* cat /proc/sys/kernel/pid_max returns 49152 on os1 */
-  int pid_str_buff_sz = 5 * sizeof(char); 
+  int pid_str_buff_sz = PID_MAX_LEN * sizeof(char); 
   char pid_str[pid_str_buff_sz]; 
   sprintf(pid_str, "%i", pid);
   //add 3 for two delims and a null byte
@@ -196,7 +198,7 @@ void mk_room_files(Room *rm, char *dir)
     strcat( strcat( strcat( strcat(fn, dir), &psep), (rm+i)->rm_name), suffix);
     if(DEBUG)
       printf("filename: %s\n", fn);
-    fd = open(fn, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+    fd = open(fn, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR | S_IXUSR);
     if(fd >= 0)
       write_room_file(fd, rm, i);
     else
@@ -332,7 +334,7 @@ Room* gen_rooms(int count, char *names[])
 int main( int argc, char **args )
 {
   /* Declare and init an array of ten room labels */
-  char *ten_rooms[] = {"BritCol", "Alberta", "Saskatch", "Manitoba", "Ontario", "Quebec", "NewfLab", "NewBrun", "NovaScot", "PrinceEd"};
+  char *ten_rooms[] = {"BritCo", "Albert", "Saskat", "Manito", "Ontari", "Quebec", "NewLab", "NeBrun", "NoScot", "PrinEd"};
  
   /* get the PID */
   pid_t pid = getpid();
