@@ -12,6 +12,7 @@
 #define DEBUG 0
 #endif
 
+#define ROOM_CNT_MAX    10
 #define ROOM_CNT        7
 #define NAME_LEN        9
 #define ONID            "boettchc\0"
@@ -219,7 +220,7 @@ void get_rm_name(char *names[], Room *rm)
   
   do
   {
-    idx = get_rand(0, sizeof(names));
+    idx = get_rand(0, ROOM_CNT_MAX-1);
     if(names[idx] != NULL)
     {
       strcpy(rm->rm_name, names[idx]);
