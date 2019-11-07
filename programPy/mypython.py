@@ -26,7 +26,6 @@ inclusive).
 4. Finally, on the last (sixth) line, print out the product of the two numbers.
 
 '''
-from os import getpid
 from random import randint, seed
 
 
@@ -34,6 +33,7 @@ STR_CNT             =   3
 CHAR_CNT            =   10
 NUM_CNT             =   2
 DEEP_THOUGHT        =   42
+FILENAMES           =   ['_majikthise', '_vroomfondel', '_marvin']
 ASCII_LC_BEGIN      =   97
 ASCII_LC_END        =   122
 
@@ -65,24 +65,23 @@ def getRandStr(chars):
     return zaphod
 
 
-def writeStrToFile(rstr, pid):
-    filename = rstr + '_' + str(pid)
+def writeStrToFile(rstr, filename):
     with open(filename, "w", CHAR_CNT+1, encoding="ascii") as f:
         if f.write(rstr+'\n') != CHAR_CNT+1:
             print("Write error.")
 
 
-def doCharStrs(count, pid):
+def doCharStrs(count, filenames):
     randstr = 'notrand'
     for n in range(count):
         randstr = getRandStr(CHAR_CNT)
         print(randstr)
-        writeStrToFile(randstr, pid)
+        writeStrToFile(randstr, filenames[n])
 
 
 def main():
     seed()
-    doCharStrs(STR_CNT, getpid())
+    doCharStrs(STR_CNT, FILENAMES)
     doNumerics(NUM_CNT)
 
 
