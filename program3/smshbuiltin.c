@@ -16,7 +16,9 @@
 
 void run_exit(int pid_arr[])
 {
-  raise(SIGKILL);
+  if(DEBUG){fprintf(stderr, "%s\n", "In run_exit...");}
+  kill(0,SIGKILL);
+  //raise(SIGKILL);
 }
 
 void run_cd(Cmd *cs)

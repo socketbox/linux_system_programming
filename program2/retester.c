@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
   memset(&matches, 0, MATCH_CNT*sizeof(regmatch_t));
   matchcnt = -1;
 
-  printf("Trying to match with extended regex...\n");
+  printf("\nTrying to match with extended regex...\n");
   compret = -2;
   //set REG_EXTENDED flag
   if((compret = regcomp(&compreg, pat, REG_EXTENDED)) == 0)

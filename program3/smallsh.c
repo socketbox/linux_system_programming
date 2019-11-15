@@ -63,9 +63,9 @@ int get_case(char *cmdstr)
 
 void check_builtin(Cmd *cs)
 {
-  if(strcmp(cs->the_cmd, "exit"))
+  if(strcmp(cs->the_cmd, "exit") == 0)
     cs->builtin = CASE_EXIT;
-  if(strcmp(cs->the_cmd, "status"))
+  if(strcmp(cs->the_cmd, "status") == 0)
     cs->builtin = CASE_STATUS;
   if(strcmp(cs->the_cmd, "cd") == 0)
     cs->builtin = CASE_CD;
@@ -180,7 +180,7 @@ void parse_cmdline(Cmd *cs)
 void prompt_user()
 {
   fprintf(stdout, "%s", ": ");
-  fflush(stdout);
+  //fflush(stdout);
 }
 
 
@@ -203,6 +203,12 @@ void free_cmd_struct(Cmd cs)
 
 int main(int argc, char *argv[])
 {
+  //why not do this instead of repeated calls to fflush()?
+  setbuf(stdout, NULL);
+
+  //register singal handlers
+  reg_handlers();
+
   Cmd cs;
   init_cmd_struct(&cs);
 
@@ -222,7 +228,7 @@ int main(int argc, char *argv[])
     parse_cmdline( &cs ); 
     if(DEBUG){ print_cmd_struct(&cs);}
 
-    if(cs.the_cmd)
+    if(cs.the_cmd != NULL)
     {
       //must come before check for bg flag
       if(cs.builtin > 0)
@@ -244,7 +250,7 @@ int main(int argc, char *argv[])
       else if(cs.bg && !sigtstp)
         ;//run_bg_proc(
       else
-        ;//run_fg_proc(&cs, &fge);
+        run_fg_proc(&cs, &fge);
     }
 
     /*accomodates display requirements for prompt after time command 
