@@ -1,4 +1,15 @@
+#ifndef CMDSTRUCT_H
+#define CMDSTRUCT_H
+
 #define ARGS_MAX			512
+
+
+typedef struct fgexit
+{
+  int status;
+  int signal;
+} Fgexit;
+
 
 typedef struct cmd
 {
@@ -25,4 +36,8 @@ typedef struct cmd
 
 } Cmd;
 
+void init_cmd_struct(struct cmd *cs);
 
+void print_cmd_struct(struct cmd *cs);
+
+#endif 

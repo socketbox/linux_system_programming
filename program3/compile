@@ -1,11 +1,13 @@
 #!/bin/bash
-#cannot use math library
-#gcc -ansi -lm -Wall -pedantic -g -o boettchc.buildrooms ./boettchc.buildrooms.c
-if [[ ($1 = DEBUG) ]] #|| ($1 = '') ]]
+STD="-std=gnu11"
+if [[ ($1 = DEBUG) ]] 
 then
 	echo "DEBUG profile"
 	rm -f ./smallsh 
-	gcc -std=gnu11 -Wall -pedantic -DDEBUG=1 -ggdb3 -o smallsh ./cmdstruct.h ./smallsh.c
+	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -c cmdstruct.c
+	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -c smshregex.c
+	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -c smshbuiltin.c
+	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -o smallsh ./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c
 elif [[ $1 = "PROD" ]]
 then
 	echo "PROD profile"
