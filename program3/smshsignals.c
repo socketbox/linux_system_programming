@@ -43,7 +43,10 @@ However, WIFSIGNALED and WTERMSIG are used if the process exited due to a signal
 
 void reg_handlers()
 {
-  struct sigaction SIGINT_action = {0}, SIGCHLD_action = {0}, SIGTSTP_action = {0}, ignore_action = {0};
+  struct sigaction SIGINT_action = {0};
+  struct sigaction SIGCHLD_action = {0};
+  struct sigaction SIGTSTP_action = {0};
+  struct sigaction ignore_action = {0};
 
   //SIGCHLD
   SIGCHLD_action.sa_handler = handle_chld;

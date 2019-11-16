@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "cmdstruct.h"
 
-void init_cmd_struct(struct cmd *cs)
+void init_cmd_struct(Cmd *cs)
 {
 	cs->comment = -1;
   cs->builtin = -1;
@@ -14,7 +14,7 @@ void init_cmd_struct(struct cmd *cs)
   cs->pidarg_idx = -1;
   cs->cmd_argc = -1;
   cs->the_cmd = NULL;
-  memset(cs->cmd_args, '\0', ARGS_MAX);
+  memset(cs->cmd_args, '\0', sizeof (char*)*ARGS_MAX);
 }
 
 void print_cmd_struct(struct cmd *cs)

@@ -3,6 +3,9 @@
 
 #define ARGS_MAX			512
 
+#ifndef DEBUG
+#define DEBUG					0
+#endif
 
 typedef struct fgexit
 {

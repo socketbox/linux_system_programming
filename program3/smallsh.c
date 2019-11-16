@@ -8,6 +8,7 @@
 #include "smshbuiltin.h"
 #include "cmdstruct.h"
 #include "smshsignals.h"
+#include "smshchild.h"
 
 #ifndef DEBUG
 #define DEBUG             0
@@ -48,6 +49,7 @@ int get_case(char *cmdstr)
   else
   {
     c = cmdstr[0];
+    fprintf(stderr, "c in cmdstr: %c\n", c);
     if(c == '#')
       val = CASE_COMMENT;
     else if(c == '<')
@@ -90,9 +92,11 @@ void check_arg(struct cmd *cs, int idx)
       break;
     //we know file args for redirection come one arg after the operator
     case CASE_RDSTDOUT:
+      if(DEBUG){fprintf(stderr, "wrong case: %c\n", c);}
       cs->redir_out = idx + 1;
       break; 
     case CASE_RDSTDIN:
+      if(DEBUG){fprintf(stderr, "wrong case: %c\n", c);}
       cs->redir_in = idx + 1;
       break;
     /*case CASE_BG:
@@ -123,6 +127,13 @@ void parse_cmdline(Cmd *cs)
   //nb: fgets captures through newline
   if( fgets(cmdline, sizeof cmdline, stdin) )
   {
+    /*eat remains in buffer                              
+    if (strchr(cmdline, '\n') == NULL)                    
+    {                                                    
+      int ch;                                            
+      while ((ch = fgetc(stdin)) != '\n' && ch != EOF);  
+    } */                                                   
+
     //before anything, check if we will run in bg
     check_bg(cs, cmdline);
 
@@ -136,7 +147,7 @@ void parse_cmdline(Cmd *cs)
       //check if we've got a comment
       check_comment(cs, tkstart, len);
 
-      if(!cs->comment)
+      if(cs->comment > -1)
       {
         //to be freed in free_cmd_struct() 
         cs->the_cmd = malloc(len+1);
@@ -180,7 +191,7 @@ void parse_cmdline(Cmd *cs)
 void prompt_user()
 {
   fprintf(stdout, "%s", ": ");
-  //fflush(stdout);
+  fflush(stdout);
 }
 
 
@@ -191,11 +202,11 @@ void prompt_user()
  */
 void free_cmd_struct(Cmd cs)
 {
-  if(cs.the_cmd)
+  if(cs.the_cmd != NULL)
     free(cs.the_cmd);
   for(int i=0; i < cs.cmd_argc; i++)
   {
-    if(cs.cmd_args[i]);
+    if(cs.cmd_args[i] != NULL);
       free(cs.cmd_args[i]);
   }
 }
@@ -204,18 +215,20 @@ void free_cmd_struct(Cmd cs)
 int main(int argc, char *argv[])
 {
   //why not do this instead of repeated calls to fflush()?
-  setbuf(stdout, NULL);
+  //setbuf(stdin, NULL);
+  //setbuf(stdout, NULL);
 
-  //register singal handlers
-  reg_handlers();
+  //register signal handlers
+  //reg_handlers();
 
-  Cmd cs;
+  Cmd cs = {0};
   init_cmd_struct(&cs);
 
   //pass this to fg process handler and status builtin
   Fgexit fge = {-1, -1};
 
   int sigtstp = 0;
+  //intended to hold pids if I'm incapable of coding SIGCHLD listener 
   int pid_arr[RLIMIT_NPROC] = {0};
 
   do 
@@ -250,7 +263,7 @@ int main(int argc, char *argv[])
       else if(cs.bg && !sigtstp)
         ;//run_bg_proc(
       else
-        run_fg_proc(&cs, &fge);
+        run_fg_child(&cs, &fge);
     }
 
     /*accomodates display requirements for prompt after time command 
@@ -273,7 +286,8 @@ int main(int argc, char *argv[])
         fflush(stdout);
         break; 
     }*/
-    free_cmd_struct(cs);
+    //TODO
+    //free_cmd_struct(cs);
   }
   while(true);
 

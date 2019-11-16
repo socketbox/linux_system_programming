@@ -1,18 +1,33 @@
 #!/bin/bash
 STD="-std=gnu11"
-if [[ ($1 = DEBUG) ]] 
+DBGSYM="-Og -ggdb3"
+WFLAGS="-Wall -pedantic -Wno-missing-braces"
+DFLAG="-DDEBUG=1"
+echo "\$1: $1"
+if [[ "$1" = DEBUG ]] 
 then
 	echo "DEBUG profile"
-	rm -f ./*.o
-	rm -f ./smallsh 
-	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -c cmdstruct.c
-	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -c smshsignals.c
-	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -c smshregex.c
-	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -c smshbuiltin.c
-	gcc $STD -Wall -pedantic -DDEBUG=1 -ggdb3 -I. -o smallsh ./smshsignals.o ./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c
-elif [[ $1 = "PROD" ]]
+elif [[ "$1" = GDB ]] 
 then
+	echo "GBD profile"
+	DFLAG=""
+	echo "DFLAG: $DFLAG"
+elif [[ "$1" == PROD ]] 
+then 
 	echo "PROD profile"
-	rm -f ./smallsh 
-	gcc -std=c11 -Wall -pedantic -o smallsh ./cmdstruct.h ./smallsh.c
+	DFLAG=""
+	echo "DFLAG: $DFLAG"
+	DBGSYM=""
 fi
+rm -f ./*.o
+rm -f ./smallsh 
+echo "Values--STD: $STD; DFLAG: $DFLAG; DBGSYM: $DBGSYM"
+gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c cmdstruct.c
+gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshbuiltin.c
+gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshchild.c
+gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshregex.c
+gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshsignals.c
+echo "gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o
+./smshregex.o ./cmdstruct.o ./smallsh.c"
+gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c
+
