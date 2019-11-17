@@ -3,6 +3,25 @@
 #include <stdio.h>
 #include "cmdstruct.h"
 
+
+/* pre:   n/a
+ * in:    an instance of Cmd struct
+ * out:   n/a
+ * post:  memory freed
+ */
+void free_cmd_struct(Cmd *cs)
+{
+  if(cs->the_cmd != NULL)
+  {  
+    free(cs->the_cmd);
+  }
+  for(int i=0; i < cs->cmd_argc; i++)
+  {
+    if(cs->cmd_args[i] != NULL);
+      free(cs->cmd_args[i]);
+  }
+}
+
 void init_cmd_struct(Cmd *cs)
 {
 	cs->comment = -1;
@@ -13,8 +32,6 @@ void init_cmd_struct(Cmd *cs)
   cs->pidarg = -1;
   cs->pidarg_idx = -1;
   cs->cmd_argc = -1;
-  cs->the_cmd = NULL;
-  memset(cs->cmd_args, '\0', sizeof (char*)*ARGS_MAX);
 }
 
 void print_cmd_struct(struct cmd *cs)

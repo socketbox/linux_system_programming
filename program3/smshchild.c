@@ -104,7 +104,7 @@ void exec_fg_cmd(Cmd *cs, char *arg_arr[])
   //fflush(stdout);
 }
 
-pid_t run_fg_child(Cmd *cs, Fgexit *fg)
+pid_t run_fg_child(Cmd *cs, Fgexit *fge)
 {
   //TODO: probably should be passed in from the caller
   int em;
@@ -134,13 +134,13 @@ pid_t run_fg_child(Cmd *cs, Fgexit *fg)
       spawnpid = waitpid(spawnpid, &em, 0); 
       if (WIFEXITED(em))
       {
-        printf("The process exited normally\n");
-        int exitStatus = WEXITSTATUS(em);
-        printf("exit status was %d\n", exitStatus);
+        if(DEBUG){fprintf(stderr, "The process exited normally\n");}
+        fge->status = WEXITSTATUS(em);
       }
       else if(WIFSIGNALED(em))
       {
-        int termSignal = WTERMSIG(em);
+        if(DEBUG){fprintf(stderr, "The process was signalled.\n");}
+        fge->signal = WTERMSIG(em);
       }
       break;
   }

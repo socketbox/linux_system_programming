@@ -18,7 +18,6 @@ void run_exit(int pid_arr[])
 {
   if(DEBUG){fprintf(stderr, "%s\n", "In run_exit...");}
   kill(0,SIGKILL);
-  //raise(SIGKILL);
 }
 
 void run_cd(Cmd *cs)
@@ -62,5 +61,9 @@ void run_cd(Cmd *cs)
 
 void run_status(Fgexit *fge)
 {
+  if(fge->signal > -666)
+    fprintf(stderr, "terminated by signal %i\n", fge->signal);
+  else if(fge->status > -666)
+    fprintf(stderr, "exit value %i\n", fge->status);
 }
 

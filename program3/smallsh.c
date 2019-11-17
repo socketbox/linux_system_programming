@@ -160,22 +160,26 @@ void parse_cmdline(Cmd *cs)
 
         //check for builtin
         check_builtin(cs);
-
-        int argcnt = 0; 
-        while( ( (tkstart = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
-        { 
-          len = strlen(tkstart);
-          //to be freed in free_cmd_struct() 
-          cs->cmd_args[argcnt] = malloc(len+1);
-          if(cs->cmd_args[argcnt])
-          {
-            memset(cs->cmd_args[argcnt], '\0', len+1 );
-            strcpy(cs->cmd_args[argcnt], tkstart);
+  
+        //status and exit don't take args, so we can skip the arg loop
+        if(cs->builtin == -1 || cs->builtin == CASE_CD)
+        {
+          int argcnt = 0; 
+          while( ( (tkstart = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
+          { 
+            len = strlen(tkstart);
+            //to be freed in free_cmd_struct() 
+            cs->cmd_args[argcnt] = malloc(len+1);
+            if(cs->cmd_args[argcnt])
+            {
+              memset(cs->cmd_args[argcnt], '\0', len+1 );
+              strcpy(cs->cmd_args[argcnt], tkstart);
+            }
+            check_arg(cs, argcnt);
+            argcnt++;   
           }
-          check_arg(cs, argcnt);
-          argcnt++;   
+          cs->cmd_argc = argcnt;
         }
-        cs->cmd_argc = argcnt;
       }
     }
   }
@@ -195,23 +199,6 @@ void prompt_user()
 }
 
 
-/* pre:   n/a
- * in:    an instance of Cmd struct
- * out:   n/a
- * post:  memory freed
- */
-void free_cmd_struct(Cmd cs)
-{
-  if(cs.the_cmd != NULL)
-    free(cs.the_cmd);
-  for(int i=0; i < cs.cmd_argc; i++)
-  {
-    if(cs.cmd_args[i] != NULL);
-      free(cs.cmd_args[i]);
-  }
-}
-
-
 int main(int argc, char *argv[])
 {
   //why not do this instead of repeated calls to fflush()?
@@ -220,12 +207,14 @@ int main(int argc, char *argv[])
 
   //register signal handlers
   //reg_handlers();
-
+  
   Cmd cs = {0};
-  init_cmd_struct(&cs);
 
   //pass this to fg process handler and status builtin
-  Fgexit fge = {-1, -1};
+  Fgexit fge = {0};
+
+  //use a bitfield to track state
+  State st = {0};
 
   int sigtstp = 0;
   //intended to hold pids if I'm incapable of coding SIGCHLD listener 
@@ -233,6 +222,9 @@ int main(int argc, char *argv[])
 
   do 
   {
+    //reset the cmd struct
+    init_cmd_struct(&cs);
+   
     if(false)
     {
       //display child background process termination
@@ -257,6 +249,9 @@ int main(int argc, char *argv[])
           case CASE_STATUS:
             run_status(&fge);
             break;
+          default:
+            fprintf(stderr, "No builtin with that name. Exiting.");
+            exit(-666);
         }
       }
       //cannot run in bg if flag for SIGTSTP was toggled on
@@ -265,31 +260,10 @@ int main(int argc, char *argv[])
       else
         run_fg_child(&cs, &fge);
     }
-
-    /*accomodates display requirements for prompt after time command 
-    if(u.cmd != 't')
-    {
-      memset(&u, 0, sizeof(Usrin));
-      display_node(curr_node);
-    }
-    parse_user_input(&u, curr_node); 
-    switch(u.cmd)
-    {
-      case 't':
-        show_time(&tf_mutex);
-        break;
-      case 'n':
-        route_user(&u, &curr_node, nodes, route, &steps);
-        break;
-      case 'h':
-        fprintf(stdout, "\n%s\n", HUH);
-        fflush(stdout);
-        break; 
-    }*/
-    //TODO
-    //free_cmd_struct(cs);
   }
   while(true);
+  //TODO - ojo
+  free_cmd_struct(&cs);
 
   return 0;
 }

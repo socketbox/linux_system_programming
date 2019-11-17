@@ -7,6 +7,15 @@
 #define DEBUG					0
 #endif
 
+typedef struct state
+{
+  unsigned int fg_init			: 1;
+  unsigned int fg_cmd				: 1;
+	unsigned int bg_cmd				: 1;
+	unsigned int builtin_cmd	: 1;
+} State;
+
+
 typedef struct fgexit
 {
   int status;
@@ -42,5 +51,7 @@ typedef struct cmd
 void init_cmd_struct(struct cmd *cs);
 
 void print_cmd_struct(struct cmd *cs);
+
+void free_cmd_struct(struct cmd *cs);
 
 #endif 
