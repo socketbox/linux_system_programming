@@ -65,9 +65,9 @@ void run_status(Fgexit *fge, State *st)
   //no foreground process has been run, so we return 0
   if(st->fg_init == 0)
     fprintf(stderr, "exit value %i\n", st->fg_init);
-  if(st->fg_init && fge->signal > INT_MAX)
+  if(st->fg_init && fge->signal > INT_MIN)
     fprintf(stderr, "terminated by signal %i\n", fge->signal);
-  if(st->fg_init && fge->status > INT_MAX)
+  if(st->fg_init && fge->status > INT_MIN)
     fprintf(stderr, "exit value %i\n", fge->status);
 }
 

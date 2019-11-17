@@ -128,13 +128,6 @@ void parse_cmdline(Cmd *cs)
   //nb: fgets captures through newline
   if( fgets(cmdline, sizeof cmdline, stdin) )
   {
-    /*eat remains in buffer                              
-    if (strchr(cmdline, '\n') == NULL)                    
-    {                                                    
-      int ch;                                            
-      while ((ch = fgetc(stdin)) != '\n' && ch != EOF);  
-    } */                                                   
-
     //before anything, check if we will run in bg
     check_bg(cs, cmdline);
 
@@ -161,7 +154,7 @@ void parse_cmdline(Cmd *cs)
         check_builtin(cs);
   
         //status and exit don't take args, so we can skip the arg loop
-        if(cs->builtin == -1 || cs->builtin == CASE_CD)
+        if(!(cs->builtin == CASE_STATUS || cs->builtin == CASE_EXIT))
         {
           int argcnt = 0; 
           while( ( (tkstart = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
@@ -200,7 +193,6 @@ void prompt_user()
 int main(int argc, char *argv[])
 {
   //why not do this instead of repeated calls to fflush()?
-  //setbuf(stdin, NULL);
   //setbuf(stdout, NULL);
 
   //register signal handlers
@@ -210,7 +202,7 @@ int main(int argc, char *argv[])
   Cmd cs = {0};
 
   //pass this to fg process handler and status builtin
-  Fgexit fge = {0};
+  Fgexit fge = {INT_MIN, INT_MIN};
 
   //use a bitfield to track state
   State st = {0};
@@ -223,7 +215,7 @@ int main(int argc, char *argv[])
   {
     //reset the cmd struct
     init_cmd_struct(&cs);
-   
+
     if(false)
     {
       //display child background process termination
@@ -259,26 +251,33 @@ int main(int argc, char *argv[])
             break;
         }
       }
-      //cannot run in bg if flag for SIGTSTP was toggled on
-      else if(cs.bg && !sigtstp)
-      {
-        //set state, assuming we will run a background cmd
-        st.bg_cmd = 1;
-        st.fg_cmd = st.builtin_cmd = 0;
-        //run_bg_proc()
-      }
-      //check for bg char sets cs.bg to 0 on failure
-      else if(!cs.bg)
-      {
-        //set state, assuming we will run a foreground cmd
-        st.fg_cmd = st.fg_init = 1;
-        st.bg_cmd = st.builtin_cmd = 0;
-        run_fg_child(&cs, &fge);
-      }
       else
       {
-        fprintf(stderr, "No matching command or function. Exiting");
-        exit(-666);
+        //this is awkward, but we must wait to reset status until
+        //we're sure that the status builtin hasn't been called 
+        fge.status = fge.signal = INT_MIN;
+      
+        //cannot run in bg if flag for SIGTSTP was toggled on
+        if(cs.bg && !sigtstp)
+        {
+          //set state, assuming we will run a background cmd
+          st.bg_cmd = 1;
+          st.fg_cmd = st.builtin_cmd = 0;
+          //run_bg_proc()
+        }
+        //check for bg char sets cs.bg to 0 on failure
+        else if(!cs.bg)
+        {
+          //set state, assuming we will run a foreground cmd
+          st.fg_cmd = st.fg_init = 1;
+          st.bg_cmd = st.builtin_cmd = 0;
+          run_fg_child(&cs, &fge);
+        }
+        else
+        {
+          fprintf(stderr, "No matching command or function. Exiting");
+          exit(1);
+        }
       }
     }
   }
