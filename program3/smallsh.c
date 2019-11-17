@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -49,7 +50,7 @@ int get_case(char *cmdstr)
   else
   {
     c = cmdstr[0];
-    fprintf(stderr, "c in cmdstr: %c\n", c);
+    if(DEBUG) { fprintf(stderr, "c in cmdstr: %c\n", c); }
     if(c == '#')
       val = CASE_COMMENT;
     else if(c == '<')
@@ -154,10 +155,8 @@ void parse_cmdline(Cmd *cs)
         //check malloc success 
         if(cs->the_cmd)
         {
-          memset(cs->the_cmd, '\0', len+1);
           strcpy(cs->the_cmd, tkstart);
         }
-
         //check for builtin
         check_builtin(cs);
   
@@ -172,7 +171,6 @@ void parse_cmdline(Cmd *cs)
             cs->cmd_args[argcnt] = malloc(len+1);
             if(cs->cmd_args[argcnt])
             {
-              memset(cs->cmd_args[argcnt], '\0', len+1 );
               strcpy(cs->cmd_args[argcnt], tkstart);
             }
             check_arg(cs, argcnt);
@@ -207,7 +205,8 @@ int main(int argc, char *argv[])
 
   //register signal handlers
   //reg_handlers();
-  
+ 
+  //better to do Cmd *cs = calloc(sizeof(Cmd)) and keep everything in the heap?
   Cmd cs = {0};
 
   //pass this to fg process handler and status builtin
@@ -240,6 +239,11 @@ int main(int argc, char *argv[])
       {
         switch(cs.builtin)
         {
+          /*set state, assuming we will run a builtin cmd
+           * ideally, each of these functions would return an exit code of 
+           * some sort*/
+          st.builtin_cmd = 1;
+          st.fg_cmd = st.bg_cmd = 0;
           case CASE_EXIT:
             run_exit(pid_arr);
             break;
@@ -247,18 +251,35 @@ int main(int argc, char *argv[])
             run_cd(&cs);
             break;
           case CASE_STATUS:
-            run_status(&fge);
+            run_status(&fge, &st);
             break;
           default:
             fprintf(stderr, "No builtin with that name. Exiting.");
             exit(-666);
+            break;
         }
       }
       //cannot run in bg if flag for SIGTSTP was toggled on
       else if(cs.bg && !sigtstp)
-        ;//run_bg_proc(
-      else
+      {
+        //set state, assuming we will run a background cmd
+        st.bg_cmd = 1;
+        st.fg_cmd = st.builtin_cmd = 0;
+        //run_bg_proc()
+      }
+      //check for bg char sets cs.bg to 0 on failure
+      else if(!cs.bg)
+      {
+        //set state, assuming we will run a foreground cmd
+        st.fg_cmd = st.fg_init = 1;
+        st.bg_cmd = st.builtin_cmd = 0;
         run_fg_child(&cs, &fge);
+      }
+      else
+      {
+        fprintf(stderr, "No matching command or function. Exiting");
+        exit(-666);
+      }
     }
   }
   while(true);

@@ -3,11 +3,10 @@ STD="-std=gnu11"
 DBGSYM="-Og -ggdb3"
 WFLAGS="-Wall -pedantic -Wno-missing-braces"
 DFLAG="-DDEBUG=1"
-echo "\$1: $1"
 if [[ "$1" = DEBUG ]] 
 then
 	echo "DEBUG profile"
-elif [[ "$1" = GDB ]] 
+elif [[ "$1" = "-g" ]] 
 then
 	echo "GBD profile"
 	DFLAG=""
@@ -30,4 +29,10 @@ gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshsignals.c
 echo "gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o
 ./smshregex.o ./cmdstruct.o ./smallsh.c"
 gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c
-
+if [[ "$1" = "-g" ]]
+then
+	if [[ "$2" = "-x" ]]
+		then
+			gdb ./smallsh
+	fi
+fi

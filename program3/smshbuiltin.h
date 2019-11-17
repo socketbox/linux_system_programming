@@ -4,6 +4,6 @@
 
 void run_exit(int pid_arr[]);
 void run_cd(Cmd *cs);
-void run_status(Fgexit *fge);
+void run_status(Fgexit *fge, State *st);
 
 #endif

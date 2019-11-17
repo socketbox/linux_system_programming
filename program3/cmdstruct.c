@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,17 +23,21 @@ void free_cmd_struct(Cmd *cs)
   }
 }
 
+
 void init_cmd_struct(Cmd *cs)
 {
-	cs->comment = -1;
-  cs->builtin = -1;
-  cs->bg = -1;
-  cs->redir_in = -1;
-  cs->redir_out = -1;
-  cs->pidarg = -1;
-  cs->pidarg_idx = -1;
-  cs->cmd_argc = -1;
+	cs->comment = INT_MIN;
+  cs->builtin = INT_MIN;
+  cs->bg = INT_MIN;
+  cs->redir_in = INT_MIN;
+  cs->redir_out = INT_MIN;
+  cs->pidarg = INT_MIN;
+  cs->pidarg_idx = INT_MIN;
+  cs->cmd_argc = INT_MIN;
+  cs->the_cmd = NULL;
+  for(int x=0; x<ARGS_MAX; x++){ cs->cmd_args[x] = NULL;}
 }
+
 
 void print_cmd_struct(struct cmd *cs)
 {
@@ -54,6 +59,5 @@ void print_cmd_struct(struct cmd *cs)
     fprintf(stderr, "arg%i: %s\n", i, cs->cmd_args[i]);
   }
 }
-
 
 

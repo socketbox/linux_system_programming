@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -59,11 +60,14 @@ void run_cd(Cmd *cs)
   }
 }
 
-void run_status(Fgexit *fge)
+void run_status(Fgexit *fge, State *st)
 {
-  if(fge->signal > -666)
+  //no foreground process has been run, so we return 0
+  if(st->fg_init == 0)
+    fprintf(stderr, "exit value %i\n", st->fg_init);
+  if(st->fg_init && fge->signal > INT_MAX)
     fprintf(stderr, "terminated by signal %i\n", fge->signal);
-  else if(fge->status > -666)
+  if(st->fg_init && fge->status > INT_MAX)
     fprintf(stderr, "exit value %i\n", fge->status);
 }
 
