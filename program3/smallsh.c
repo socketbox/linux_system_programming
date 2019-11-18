@@ -59,6 +59,7 @@ void parse_cmdline(Cmd *cs)
   char cmdline[CMD_LINE_MAX] = "\0";
   char *delims = " \n"; 
   char *tkstart = NULL;
+  char *tkarg = NULL;
   char *tkstate = NULL;
   char **tks = &tkstate; 
   int len = -1;
@@ -95,16 +96,17 @@ void parse_cmdline(Cmd *cs)
         if(!(cs->builtin == CASE_STATUS || cs->builtin == CASE_EXIT))
         {
           int argcnt = 0; 
-          while( ( (tkstart = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
+          while( ( (tkarg = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
           { 
-            len = strlen(tkstart);
+            len = strlen(tkarg);
             //to be freed in free_cmd_struct() 
             cs->cmd_args[argcnt] = malloc(len+1);
             if(cs->cmd_args[argcnt])
             {
-              strcpy(cs->cmd_args[argcnt], tkstart);
+              strcpy(cs->cmd_args[argcnt], tkarg);
             }
             check_redir(cs, argcnt);
+            check_pid(cs->cmd_args[argcnt]); 
             argcnt++;   
           }
           cs->cmd_argc = argcnt;

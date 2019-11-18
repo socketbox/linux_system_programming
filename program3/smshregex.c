@@ -3,12 +3,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <regex.h>
+#include <unistd.h>
 #include "smshregex.h"
 #include "cmdstruct.h"
 
 #ifndef DEBUG
 #define DEBUG     0
 #endif
+
+/* cat /proc/sys/kernel/pid_max returns 49152 on os1 */
+#define PID_MAX_LEN   5
 
 
 void check_builtin(Cmd *cs)
@@ -77,47 +81,55 @@ void check_comment(Cmd *cs, char *token, int len)
 }
 
 
-/* pre:   user's command was obtained
- * in:    raw command string
- * out:   n/a
- * post:  cmdline altered with substituted pid
- */
-void check_pid(char *cmdline)
+void interpolate(regmatch_t matches[], char *pidstr, char *arg)
 {
-  //sanity check 
-  int len = strlen(cmdline);
-  assert(cmdline[len] == '\0');
-  assert(cmdline[len-1] == '\n');
-  
-  //match an ampersand with zero or more whitespace chars around it right before line's end
-  char *pat = "([$]{2,}?)";
+  fprintf(stderr, "%s\n", "in interpolate");
+  char * 
+  strcat( 
+}
+
+
+/* pre:   user's command was obtained
+ * in:    Cmd struct, index of string argument to be matched
+ * out:   n/a
+ * post:  argument altered, in Cmd struct, with substituted pid
+ */
+void check_pid(Cmd *cs, int argidx)
+{
+  char *arg = cs->cmd_args[argidx];
+  //match a double dollar sign
+  char *pat = "[$]{2}";
   char *errbuff;  
   regex_t compreg;
   memset(&compreg, 0, sizeof(regex_t));
+  
+  regmatch_t matches[1];
+  memset(&matches, 0, sizeof(regmatch_t));
+  int matchcnt = -1;
 
   int compret = -2;
   //set extended regex flag and the ignore subgroups flag
-  if((compret = regcomp(&compreg, pat, REG_EXTENDED | REG_NOSUB)) == 0)
+  if((compret = regcomp(&compreg, pat, REG_EXTENDED)) == 0)
   {
     int execret = -2;
-    if((execret = regexec(&compreg, cmdline, 0, NULL, 0)) == 0)
+    if((execret = regexec(&compreg, arg, matchcnt, matches, 0)) == 0)
     {
       if(DEBUG){fprintf(stderr, "%s", "Regex match for $$\n");};
-      //now zap the & so we don't have to mess with it later
-      char *amp = strrchr(cmdline, '&');
-      *amp = '\n';
-      *(amp+1) = '\0';
+      //now replace the match with a pid
+      char pidstr[PID_MAX_LEN+1];
+      snprintf(pidstr, PID_MAX_LEN+1, "%d", getpid());
+      if(DEBUG){fprintf(stderr, "This is pidstr: %s\n", pidstr);} 
+      //modify argument 
+      interpolate(matches, pidstr, arg);
     }
     else if(execret != 0)
     {
-      if(1){fprintf(stderr, "%s", "Regexec failed.\n");};
+      if(DEBUG){fprintf(stderr, "Regexec failed for %s\n", arg);};
       size_t errbuffsz = regerror(execret, &compreg, 0, 0);
       errbuff = malloc(errbuffsz);
       memset(errbuff, '\0', errbuffsz);
       regerror(execret, &compreg, errbuff, errbuffsz);
-      if(1){fprintf(stderr, "Regexec error: %s\n", errbuff);}
-      //modify original cmdline 
-      //TODO 
+      if(DEBUG){fprintf(stderr, "Regexec error: %s\n", errbuff);}
       free(errbuff);
       errbuff = NULL;
     }

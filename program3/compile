@@ -3,6 +3,8 @@ STD="-std=gnu11"
 DBGSYM="-Og -ggdb3"
 WFLAGS="-Wall -pedantic -Wno-missing-braces"
 DFLAG="-DDEBUG=1"
+echo "Running 'ctags -R *'"
+ctags -R *
 if [[ "$1" = DEBUG ]] 
 then
 	echo "DEBUG profile"
