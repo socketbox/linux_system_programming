@@ -15,10 +15,6 @@
 #define DEBUG             0
 #endif 
 
-//#define CASE_BG           38  
-#define CASE_EXIT         1
-#define CASE_CD           2
-#define CASE_STATUS       3
 #define CASE_PID          164 
 #define CASE_RDSTDOUT     62
 #define CASE_RDSTDIN      60
@@ -29,85 +25,27 @@
 #define RLIMIT_NPROC      4096
 
 
-/* pre:   n/a 
- * in:    a string to be characterized
- * out:   an integer 
- * post:  n/a
- */
-int get_case(char *cmdstr)
-{
-  int val = 0;
-  char c = '\0';
-  
-  if(DEBUG){ fprintf(stderr, "Arg to get_case: %s\n", cmdstr);}
-
-  //check for builtin
-  if(strlen(cmdstr) > 1)
-  {
-    if(strcmp(cmdstr, "$$") == 0) 
-      val = CASE_PID;
-  }
-  else
-  {
-    c = cmdstr[0];
-    if(DEBUG) { fprintf(stderr, "c in cmdstr: %c\n", c); }
-    if(c == '#')
-      val = CASE_COMMENT;
-    else if(c == '<')
-      val = CASE_RDSTDIN;
-    else if(c == '>')
-      val = CASE_RDSTDOUT;
-    /*else if(c == '&')
-      val = CASE_BG;*/
-  }
-  return val;
-}
-
-
-void check_builtin(Cmd *cs)
-{
-  if(strcmp(cs->the_cmd, "exit") == 0)
-    cs->builtin = CASE_EXIT;
-  if(strcmp(cs->the_cmd, "status") == 0)
-    cs->builtin = CASE_STATUS;
-  if(strcmp(cs->the_cmd, "cd") == 0)
-    cs->builtin = CASE_CD;
-}
-
-
 /*
  * pre:   an array of command arguments in cmd struct argument is partially populated
  * in:    a cmd struct pointer; index of the argument to check; the entire string of user input
  * out:   n/a
  * post:  n/a
  */
-void check_arg(struct cmd *cs, int idx)
+void check_redir(struct cmd *cs, int idx)
 {
-  int c = get_case(cs->cmd_args[idx]);
-  
-  switch(c)
-  {
-    case CASE_PID:
-      cs->pidarg = getpid();
-      cs->pidarg_idx = idx;
-      break;
-    //we know file args for redirection come one arg after the operator
-    case CASE_RDSTDOUT:
-      if(DEBUG){fprintf(stderr, "wrong case: %c\n", c);}
-      cs->redir_out = idx + 1;
-      break; 
-    case CASE_RDSTDIN:
-      if(DEBUG){fprintf(stderr, "wrong case: %c\n", c);}
-      cs->redir_in = idx + 1;
-      break;
-    /*case CASE_BG:
-      cs->bg = 1;
-      break;*/
-    case CASE_COMMENT:
-      cs->comment = 1;
-    default:
+    char *arg = cs->cmd_args[idx];
+   //we know file args for redirection come one arg after the operator
+    if(strlen(arg) == 1)
+    { 
+      if(strcmp(arg, ">") == 0)
+        cs->redir_out = idx + 1;
+      else if( strcmp(arg, "<") == 0)
+        cs->redir_in = idx + 1;
+    }
+    else
+    {
       if(DEBUG){fprintf(stderr, "arg %i: %s\n", idx, cs->cmd_args[idx]);}  
-  }
+    }
 }
 
 
@@ -141,7 +79,7 @@ void parse_cmdline(Cmd *cs)
       //check if we've got a comment
       check_comment(cs, tkstart, len);
 
-      if(cs->comment > -1)
+      if(cs->comment < 1)
       {
         //to be freed in free_cmd_struct() 
         cs->the_cmd = malloc(len+1);
@@ -166,7 +104,7 @@ void parse_cmdline(Cmd *cs)
             {
               strcpy(cs->cmd_args[argcnt], tkstart);
             }
-            check_arg(cs, argcnt);
+            check_redir(cs, argcnt);
             argcnt++;   
           }
           cs->cmd_argc = argcnt;
@@ -204,11 +142,12 @@ int main(int argc, char *argv[])
   //pass this to fg process handler and status builtin
   Fgexit fge = {INT_MIN, INT_MIN};
 
+  //TODO: must be passed to SIGTSTP handler or modified using results thereof
   //use a bitfield to track state
   State st = {0};
 
-  int sigtstp = 0;
   //intended to hold pids if I'm incapable of coding SIGCHLD listener 
+  int pidcnt = 0;
   int pid_arr[RLIMIT_NPROC] = {0};
 
   do 
@@ -258,12 +197,12 @@ int main(int argc, char *argv[])
         fge.status = fge.signal = INT_MIN;
       
         //cannot run in bg if flag for SIGTSTP was toggled on
-        if(cs.bg && !sigtstp)
+        if(cs.bg && !st.sigtstp)
         {
           //set state, assuming we will run a background cmd
           st.bg_cmd = 1;
           st.fg_cmd = st.builtin_cmd = 0;
-          //run_bg_proc()
+          run_bg_child(&cs, &pidcnt, pid_arr);
         }
         //check for bg char sets cs.bg to 0 on failure
         else if(!cs.bg)
