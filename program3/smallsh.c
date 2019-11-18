@@ -95,18 +95,22 @@ void parse_cmdline(Cmd *cs)
         //status and exit don't take args, so we can skip the arg loop
         if(!(cs->builtin == CASE_STATUS || cs->builtin == CASE_EXIT))
         {
-          int argcnt = 0; 
+          int argcnt, pid_sub;
+          argcnt = pid_sub = 0; 
           while( ( (tkarg = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
           { 
             len = strlen(tkarg);
-            //to be freed in free_cmd_struct() 
-            cs->cmd_args[argcnt] = malloc(len+1);
-            if(cs->cmd_args[argcnt])
-            {
-              strcpy(cs->cmd_args[argcnt], tkarg);
+            //need to check for $$ and sub. here, or realloc within the arg array later 
+            if((pid_sub = check_pid(cs, tkarg, argcnt)) == 0 )
+            { 
+              //to be freed in free_cmd_struct() 
+              cs->cmd_args[argcnt] = malloc(len+1);
+              if(cs->cmd_args[argcnt])
+              {
+                strcpy(cs->cmd_args[argcnt], tkarg);
+              }
+              check_redir(cs, argcnt);
             }
-            check_redir(cs, argcnt);
-            check_pid(cs->cmd_args[argcnt]); 
             argcnt++;   
           }
           cs->cmd_argc = argcnt;
