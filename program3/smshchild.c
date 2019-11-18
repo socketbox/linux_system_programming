@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include "cmdstruct.h"
 #include "smshchild.h"
+#include "smshsignals.h"
 
 //TODO: fork, then call exec..(), this will allow the exec'd process to catch the SIGINT you block
 
@@ -50,10 +51,11 @@ int redir_stdin(Cmd *cs)
   fd = open(path, O_RDONLY);
   if(fd == -1)
   { 
-    perror("Failed to open file for stdout redirect"); 
+    fprintf(stderr, "cannot open %s for input\n", path); 
+    //perror("cannot open file for input"); 
     exit(1); 
   }
-  int dupres = dup2(fd, 1);
+  int dupres = dup2(fd, STDIN_FILENO);
   if(dupres == -1)
   { 
     perror("Failed to duplicate stdout to fd"); 
@@ -66,13 +68,14 @@ int redir_stdout(Cmd *cs)
 {
   //get path from arg array in Cmd struct
   char *path = cs->cmd_args[cs->redir_out];
-  int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
   if(fd == -1)
   { 
-    perror("Failed to open file for stdout redirect"); 
+    //perror("Failed to open file for stdout redirect"); 
+    fprintf(stderr, "cannot open %s for output\n", path); 
     exit(1); 
   }
-  int dupres = dup2(fd, 1);
+  int dupres = dup2(fd, STDOUT_FILENO);
   if(dupres == -1)
   { 
     perror("Failed to duplicate stdout to fd"); 
@@ -126,7 +129,8 @@ void prep_args(Cmd *cs, char *arg_arr[])
 void exec_cmd(Cmd *cs, char *arg_arr[])
 {
   execvp(cs->the_cmd, arg_arr);
-  perror("Execution of foreground command failed. Exiting.");
+  //perror("Execution of foreground command failed. Exiting.");
+  perror(cs->the_cmd);
   exit(1);
 }
 
@@ -158,6 +162,8 @@ void run_bg_child(Cmd *cs, int *pidcnt, int pid_arr[])
         redir_stdin(cs);
       else
         drain(0);
+      //block SIGINT and SIGTSTP 
+      set_bg_mask(); 
       exec_cmd(cs, arg_arr);
       break;
     
@@ -193,10 +199,13 @@ pid_t run_fg_child(Cmd *cs, Fgexit *fge)
       exit(1);
       break;
     case 0:
+      //set ridirection 
       if(cs->redir_out > -1)
         redir_stdout(cs);
       if(cs->redir_in > -1)
         redir_stdin(cs);
+      //set child mask to guard against SIG_TSTP 
+      set_fg_mask(); 
       exec_cmd(cs, arg_arr);
       break;
     default:
@@ -211,6 +220,7 @@ pid_t run_fg_child(Cmd *cs, Fgexit *fge)
       {
         if(DEBUG){fprintf(stderr, "The process was signalled.\n");}
         fge->signal = WTERMSIG(em);
+        fprintf(stderr, "terminated by signal %i\n", fge->signal);
       }
       break;
   }

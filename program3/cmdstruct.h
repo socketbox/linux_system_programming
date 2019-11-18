@@ -17,7 +17,6 @@ typedef struct state
   unsigned int fg_cmd				: 1;
 	unsigned int bg_cmd				: 1;
 	unsigned int builtin_cmd	: 1;
-	unsigned int sigtstp			: 1;
 } State;
 
 

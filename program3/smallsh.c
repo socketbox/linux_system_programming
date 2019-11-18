@@ -133,14 +133,19 @@ void prompt_user()
   fflush(stdout);
 }
 
+int STOPPED;
 
 int main(int argc, char *argv[])
 {
+  STOPPED = 0;
   //why not do this instead of repeated calls to fflush()?
   //setbuf(stdout, NULL);
 
+  //set the default process mask
+  set_smsh_mask();
+ 
   //register signal handlers
-  //reg_handlers();
+  reg_smsh_handlers();
  
   //better to do Cmd *cs = calloc(sizeof(Cmd)) and keep everything in the heap?
   Cmd cs = {0};
@@ -161,10 +166,6 @@ int main(int argc, char *argv[])
     //reset the cmd struct
     init_cmd_struct(&cs);
 
-    if(false)
-    {
-      //display child background process termination
-    }
     prompt_user();
     parse_cmdline( &cs ); 
     if(DEBUG){ print_cmd_struct(&cs);}
@@ -203,12 +204,23 @@ int main(int argc, char *argv[])
         fge.status = fge.signal = INT_MIN;
       
         //cannot run in bg if flag for SIGTSTP was toggled on
-        if(cs.bg && !st.sigtstp)
+        if(cs.bg)
         {
-          //set state, assuming we will run a background cmd
-          st.bg_cmd = 1;
-          st.fg_cmd = st.builtin_cmd = 0;
-          run_bg_child(&cs, &pidcnt, pid_arr);
+          if(STOPPED)
+          {
+            cs.bg = 0;
+            //set state as if cmd was invoked for fg
+            st.fg_cmd = st.fg_init = 1;
+            st.bg_cmd = st.builtin_cmd = 0;
+            run_fg_child(&cs, &fge);
+          }
+          else
+          {
+            //set state, assuming we will run a background cmd
+            st.bg_cmd = 1;
+            st.fg_cmd = st.builtin_cmd = 0;
+            run_bg_child(&cs, &pidcnt, pid_arr);
+          }
         }
         //check for bg char sets cs.bg to 0 on failure
         else if(!cs.bg)
@@ -220,7 +232,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-          fprintf(stderr, "No matching command or function. Exiting");
+          fprintf(stderr, "smallsh: no matching command or function. Exiting");
           exit(1);
         }
       }
