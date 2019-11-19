@@ -10,10 +10,7 @@
 #include "cmdstruct.h"
 #include "smshsignals.h"
 #include "smshchild.h"
-
-#ifndef DEBUG
-#define DEBUG             0
-#endif 
+#include "signal_functions.h"
 
 #define CASE_PID          164 
 #define CASE_RDSTDOUT     62
@@ -141,9 +138,9 @@ int main(int argc, char *argv[])
   //why not do this instead of repeated calls to fflush()?
   //setbuf(stdout, NULL);
 
-  //set the default process mask
+  //set the default process mask (accept SIGCHLD, SIGINT and block rest)
   set_smsh_mask();
- 
+  
   //register signal handlers
   reg_smsh_handlers();
  
@@ -156,10 +153,6 @@ int main(int argc, char *argv[])
   //TODO: must be passed to SIGTSTP handler or modified using results thereof
   //use a bitfield to track state
   State st = {0};
-
-  //intended to hold pids if I'm incapable of coding SIGCHLD listener 
-  int pidcnt = 0;
-  int pid_arr[RLIMIT_NPROC] = {0};
 
   do 
   {
@@ -183,7 +176,7 @@ int main(int argc, char *argv[])
           st.builtin_cmd = 1;
           st.fg_cmd = st.bg_cmd = 0;
           case CASE_EXIT:
-            run_exit(pid_arr);
+            run_exit(cs);
             break;
           case CASE_CD:
             run_cd(&cs);
@@ -193,7 +186,7 @@ int main(int argc, char *argv[])
             break;
           default:
             fprintf(stderr, "No builtin with that name. Exiting.");
-            exit(-666);
+            exit(-1);
             break;
         }
       }
@@ -208,38 +201,49 @@ int main(int argc, char *argv[])
         {
           if(STOPPED)
           {
+            /* set bg to 0 and exit this block, entering the next to run as an
+             * fg command */ 
             cs.bg = 0;
-            //set state as if cmd was invoked for fg
-            st.fg_cmd = st.fg_init = 1;
-            st.bg_cmd = st.builtin_cmd = 0;
-            run_fg_child(&cs, &fge);
           }
           else
           {
             //set state, assuming we will run a background cmd
             st.bg_cmd = 1;
             st.fg_cmd = st.builtin_cmd = 0;
-            run_bg_child(&cs, &pidcnt, pid_arr);
+            run_bg_child(&cs);
           }
         }
         //check for bg char sets cs.bg to 0 on failure
-        else if(!cs.bg)
+        if(!cs.bg)
         {
+          /* Kerrisk advises the use of sigsuspend for this scenario (pp464-467),
+           * but what if there is no bg process to produce SIGCHLD? Then 
+           * wouldn't the smallsh parent remain paused indefinitely? 
+           */
+          sigset_t orig_mask, chld_mask;
+          sigemptyset(&chld_mask);
+          //neither SIGCHLD nor SIGTSTP should interrupt the fg command 
+          sigaddset(&chld_mask, SIGTSTP);
+          sigaddset(&chld_mask, SIGCHLD);
+          if(sigprocmask(SIG_BLOCK, &chld_mask, &orig_mask) == -1)
+            perror("Failed to set SIGCHLD mask before fg process");
+
           //set state, assuming we will run a foreground cmd
           st.fg_cmd = st.fg_init = 1;
           st.bg_cmd = st.builtin_cmd = 0;
           run_fg_child(&cs, &fge);
-        }
-        else
-        {
-          fprintf(stderr, "smallsh: no matching command or function. Exiting");
-          exit(1);
+
+          /* we come back from the FG process (hopefully), and unblock the SIGCHLD
+           * signal.*/
+          if(sigprocmask(SIG_SETMASK, &orig_mask, NULL) == -1)
+            perror("Failed to reset smallsh procmask after fg exit");
+
         }
       }
     }
   }
   while(true);
-  //TODO - ojo
+  
   free_cmd_struct(&cs);
 
   return 0;

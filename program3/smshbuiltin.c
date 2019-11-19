@@ -10,14 +10,11 @@
 #include "smshbuiltin.h"
 
 
-#ifndef DEBUG
-#define DEBUG   0
-#endif
-
-
-void run_exit(int pid_arr[])
+void run_exit(Cmd cs)
 {
   if(DEBUG){fprintf(stderr, "%s\n", "In run_exit...");}
+  if(cs.cmd_args != NULL)
+    free_cmd_struct(&cs);
   kill(0,SIGKILL);
 }
 

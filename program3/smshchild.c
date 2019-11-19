@@ -10,9 +10,11 @@
 #include "smshchild.h"
 #include "smshsignals.h"
 
-//TODO: fork, then call exec..(), this will allow the exec'd process to catch the SIGINT you block
 
-
+/*
+ * used when invoking a background command to direct stdout and stdin to /dev/null
+ * if not otherwise directed
+ */
 void drain(int fd)
 {
   int dn = INT_MIN;
@@ -135,7 +137,7 @@ void exec_cmd(Cmd *cs, char *arg_arr[])
 }
 
 
-void run_bg_child(Cmd *cs, int *pidcnt, int pid_arr[])
+void run_bg_child(Cmd *cs)
 {
   //prepare the arguments for call to exec 
   char *arg_arr[cs->cmd_argc + 1];
@@ -170,10 +172,7 @@ void run_bg_child(Cmd *cs, int *pidcnt, int pid_arr[])
     //parent process
     default:
       if(DEBUG){fprintf(stderr, "After spawning bg child; spawnpid: %i\n", spawnpid);}
-      //record the child's pid in the relevant array and increment the process counter 
       fprintf(stderr, "background pid is %i\n", spawnpid);
-      pid_arr[*pidcnt] = spawnpid;
-      (*pidcnt)++;
       break;
   }
   free_exec_args(cs->cmd_argc+1, arg_arr);
@@ -213,7 +212,7 @@ pid_t run_fg_child(Cmd *cs, Fgexit *fge)
       spawnpid = waitpid(spawnpid, &em, 0); 
       if (WIFEXITED(em))
       {
-        if(DEBUG){fprintf(stderr, "The process exited normally\n");}
+        if(SIGDEBUG){fprintf(stderr, "The process (%i) exited normally\n", spawnpid);}
         fge->status = WEXITSTATUS(em);
       }
       else if(WIFSIGNALED(em))
@@ -229,7 +228,6 @@ pid_t run_fg_child(Cmd *cs, Fgexit *fge)
       break;
   }
   free_exec_args(cs->cmd_argc+1, arg_arr); 
-  
   return spawnpid;  
 }
 

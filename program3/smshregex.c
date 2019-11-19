@@ -7,9 +7,6 @@
 #include "smshregex.h"
 #include "cmdstruct.h"
 
-#ifndef DEBUG
-#define DEBUG     0
-#endif
 
 /* cat /proc/sys/kernel/pid_max returns 49152 on os1 */
 #define PID_MAX_LEN   5

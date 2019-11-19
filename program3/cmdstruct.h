@@ -3,6 +3,11 @@
 
 #define ARGS_MAX			512
 
+#ifndef SIGDEBUG
+#define SIGDEBUG					0
+#endif
+
+
 #ifndef DEBUG
 #define DEBUG					0
 #endif

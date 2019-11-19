@@ -6,10 +6,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include "smshsignals.h"
-
-#ifndef DEBUG
-#define DEBUG   0
-#endif 
+#include "cmdstruct.h"
 
 int STOPPED;
 
@@ -47,41 +44,54 @@ void set_bg_mask()
 }
 
 
-void smsh_chld_hndlr(int sig)
+void smsh_chld_hndlr(int sig, siginfo_t *sigi, void *ucontext)
 {
   //Kerrisk, pp556-559
   int cpid = 0;
   int em = INT_MAX; 
   int status = INT_MAX; 
-  if(DEBUG){fprintf(stderr, "In SIGCHLD hanlder!");}
+  if(SIGDEBUG)
+  {
+    fprintf(stderr, "smsh_chld_hndlr, before cpid eval: cpid=%i; exit status %i from %i\n", \
+        cpid, sigi->si_pid, sigi->si_status);
+    perror("waitpid in amsh_chld_hndlr returned error");
+  }
   while((cpid = waitpid(-1, &em, WNOHANG)) > 0)
   {
-      if (WIFEXITED(em))
-      {
-        if(DEBUG){fprintf(stderr, "The process exited normally\n");}
-        status = WEXITSTATUS(em);
-        fprintf(stderr, "background pid %i is done: exit value %i\n", cpid, status);
-      }
-      else if(WIFSIGNALED(em))
-      {
-        status = WTERMSIG(em);
-        fprintf(stderr, "terminated by signal %i\n", status);
-      }
+    if(SIGDEBUG)
+      fprintf(stderr, "smsh_chld_hndlr, after waitpid: cpid=%i; exit status %i from %i\n", \
+          cpid, sigi->si_pid, sigi->si_status);
+
+    if (WIFEXITED(em))
+    {
+      if(DEBUG){fprintf(stderr, "The process exited normally\n");}
+      status = WEXITSTATUS(em);
+      fprintf(stderr, "background pid %i is done: exit value %i\n", cpid, status);
+    }
+    else if(WIFSIGNALED(em))
+    {
+      status = WTERMSIG(em);
+      fprintf(stderr, "terminated by signal %i\n", status);
+    }
   }
 }
 
 
-void smsh_tstp_hndlr(int sig)
+void smsh_tstp_hndlr(int sig, siginfo_t *sigi, void *ucontext)
 {
+  if(SIGDEBUG)
+    fprintf(stderr, "shsh_tstp_hndlr: from %i\n, exit status: %i", \
+        sigi->si_pid, sigi->si_status);
+
   if(!STOPPED)
   {
-    char *msg1 = "Entering foreground-only mode (& is now ignored)\0";
+    char *msg1 = "Entering foreground-only mode (& is now ignored)\n";
     write(STDOUT_FILENO, msg1, 50);
     STOPPED=1;
   }
   else
   {
-    char *msg2 = "Exiting foreground-only mode";
+    char *msg2 = "Exiting foreground-only mode\n";
     write(STDOUT_FILENO, msg2, 30);
     STOPPED=0;
   }
@@ -91,30 +101,30 @@ void smsh_tstp_hndlr(int sig)
 void reg_smsh_handlers()
 {
   //create and assign handler to SIGTSTP
-  struct sigaction smsh_act = {0};
+  struct sigaction smsh_act = {{0}};
   
   sigset_t hndl_tstp;
   sigfillset(&hndl_tstp);
   //we want to not block SIGCHLD sigdelset(&hndl_tstp, SIGTSTP);
-  sigdelset(&hndl_tstp, SIGCHLD);
+  //sigdelset(&hndl_tstp, SIGCHLD);
   smsh_act.sa_mask = hndl_tstp;
   
-  smsh_act.sa_handler = smsh_tstp_hndlr;
-  smsh_act.sa_flags = 0;
+  smsh_act.sa_sigaction = smsh_tstp_hndlr;
+  smsh_act.sa_flags = SA_SIGINFO;
 
   sigaction(SIGTSTP, &smsh_act, NULL);
 
   //create and assign handler to SIGCHLD
-  struct sigaction smsh_actchld = {0};
+  struct sigaction smsh_actchld = {{0}};
   
   sigset_t hndl_chld;
   sigfillset(&hndl_chld);
-  sigdelset(&hndl_chld, SIGTSTP);
+  //sigdelset(&hndl_chld, SIGTSTP);
   sigdelset(&hndl_chld, SIGCHLD);
   smsh_actchld.sa_mask = hndl_chld;
   
-  smsh_actchld.sa_handler = smsh_chld_hndlr;
-  smsh_actchld.sa_flags = 0;
+  smsh_actchld.sa_sigaction = smsh_chld_hndlr;
+  smsh_actchld.sa_flags = SA_SIGINFO;
 
   if(sigaction(SIGCHLD, &smsh_actchld, NULL) == -1)
     perror("Call to sigaction failed to register SIGCHLD handler");
