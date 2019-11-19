@@ -222,6 +222,10 @@ pid_t run_fg_child(Cmd *cs, Fgexit *fge)
         fge->signal = WTERMSIG(em);
         fprintf(stderr, "terminated by signal %i\n", fge->signal);
       }
+      else
+      {
+        fprintf(stderr, "Why are we here? Status/Signal: %i\n", fge->signal);
+      }
       break;
   }
   free_exec_args(cs->cmd_argc+1, arg_arr); 

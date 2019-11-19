@@ -87,26 +87,9 @@ void smsh_tstp_hndlr(int sig)
   }
 }
 
+
 void reg_smsh_handlers()
 {
-  //first, create a handler to ignore everything but SIGTSTP and SIGCHLD
-  struct sigaction smsh_ign = {0};
-
-  sigset_t chldntstp;
-  sigfillset(&chldntstp);
-  //remove SIGTSTP and SIGCHLD since we want to catch and act on them
-  sigdelset(&chldntstp, SIGCHLD);
-  sigdelset(&chldntstp, SIGTSTP);
-  smsh_ign.sa_mask = chldntstp;
-
-  smsh_ign.sa_handler = SIG_IGN;
-  smsh_ign.sa_flags = 0;
- 
-  sigaction(SIGINT, &smsh_ign, NULL);
-  sigaction(SIGHUP, &smsh_ign, NULL);
-  sigaction(SIGTERM, &smsh_ign, NULL);
-  sigaction(SIGQUIT, &smsh_ign, NULL);
-  
   //create and assign handler to SIGTSTP
   struct sigaction smsh_act = {0};
   

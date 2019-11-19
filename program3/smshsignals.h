@@ -11,6 +11,7 @@ void set_smsh_mask();
 void handle_int(int sig);
 void handle_tstp(int sig);
 void handle_chld(int sig);
-
+void reg_fg_handlers();
 void reg_smsh_handlers();
+
 #endif
