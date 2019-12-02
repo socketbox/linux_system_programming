@@ -10,15 +10,8 @@
 #include "cmdstruct.h"
 #include "smshsignals.h"
 #include "smshchild.h"
+#include "signal_functions.h"
 
-#ifndef DEBUG
-#define DEBUG             0
-#endif 
-
-//#define CASE_BG           38  
-#define CASE_EXIT         1
-#define CASE_CD           2
-#define CASE_STATUS       3
 #define CASE_PID          164 
 #define CASE_RDSTDOUT     62
 #define CASE_RDSTDIN      60
@@ -29,85 +22,27 @@
 #define RLIMIT_NPROC      4096
 
 
-/* pre:   n/a 
- * in:    a string to be characterized
- * out:   an integer 
- * post:  n/a
- */
-int get_case(char *cmdstr)
-{
-  int val = 0;
-  char c = '\0';
-  
-  if(DEBUG){ fprintf(stderr, "Arg to get_case: %s\n", cmdstr);}
-
-  //check for builtin
-  if(strlen(cmdstr) > 1)
-  {
-    if(strcmp(cmdstr, "$$") == 0) 
-      val = CASE_PID;
-  }
-  else
-  {
-    c = cmdstr[0];
-    if(DEBUG) { fprintf(stderr, "c in cmdstr: %c\n", c); }
-    if(c == '#')
-      val = CASE_COMMENT;
-    else if(c == '<')
-      val = CASE_RDSTDIN;
-    else if(c == '>')
-      val = CASE_RDSTDOUT;
-    /*else if(c == '&')
-      val = CASE_BG;*/
-  }
-  return val;
-}
-
-
-void check_builtin(Cmd *cs)
-{
-  if(strcmp(cs->the_cmd, "exit") == 0)
-    cs->builtin = CASE_EXIT;
-  if(strcmp(cs->the_cmd, "status") == 0)
-    cs->builtin = CASE_STATUS;
-  if(strcmp(cs->the_cmd, "cd") == 0)
-    cs->builtin = CASE_CD;
-}
-
-
 /*
  * pre:   an array of command arguments in cmd struct argument is partially populated
  * in:    a cmd struct pointer; index of the argument to check; the entire string of user input
  * out:   n/a
  * post:  n/a
  */
-void check_arg(struct cmd *cs, int idx)
+void check_redir(struct cmd *cs, int idx)
 {
-  int c = get_case(cs->cmd_args[idx]);
-  
-  switch(c)
-  {
-    case CASE_PID:
-      cs->pidarg = getpid();
-      cs->pidarg_idx = idx;
-      break;
-    //we know file args for redirection come one arg after the operator
-    case CASE_RDSTDOUT:
-      if(DEBUG){fprintf(stderr, "wrong case: %c\n", c);}
-      cs->redir_out = idx + 1;
-      break; 
-    case CASE_RDSTDIN:
-      if(DEBUG){fprintf(stderr, "wrong case: %c\n", c);}
-      cs->redir_in = idx + 1;
-      break;
-    /*case CASE_BG:
-      cs->bg = 1;
-      break;*/
-    case CASE_COMMENT:
-      cs->comment = 1;
-    default:
+    char *arg = cs->cmd_args[idx];
+   //we know file args for redirection come one arg after the operator
+    if(strlen(arg) == 1)
+    { 
+      if(strcmp(arg, ">") == 0)
+        cs->redir_out = idx + 1;
+      else if( strcmp(arg, "<") == 0)
+        cs->redir_in = idx + 1;
+    }
+    else
+    {
       if(DEBUG){fprintf(stderr, "arg %i: %s\n", idx, cs->cmd_args[idx]);}  
-  }
+    }
 }
 
 
@@ -121,6 +56,7 @@ void parse_cmdline(Cmd *cs)
   char cmdline[CMD_LINE_MAX] = "\0";
   char *delims = " \n"; 
   char *tkstart = NULL;
+  char *tkarg = NULL;
   char *tkstate = NULL;
   char **tks = &tkstate; 
   int len = -1;
@@ -128,13 +64,6 @@ void parse_cmdline(Cmd *cs)
   //nb: fgets captures through newline
   if( fgets(cmdline, sizeof cmdline, stdin) )
   {
-    /*eat remains in buffer                              
-    if (strchr(cmdline, '\n') == NULL)                    
-    {                                                    
-      int ch;                                            
-      while ((ch = fgetc(stdin)) != '\n' && ch != EOF);  
-    } */                                                   
-
     //before anything, check if we will run in bg
     check_bg(cs, cmdline);
 
@@ -148,7 +77,7 @@ void parse_cmdline(Cmd *cs)
       //check if we've got a comment
       check_comment(cs, tkstart, len);
 
-      if(cs->comment > -1)
+      if(cs->comment < 1)
       {
         //to be freed in free_cmd_struct() 
         cs->the_cmd = malloc(len+1);
@@ -161,19 +90,24 @@ void parse_cmdline(Cmd *cs)
         check_builtin(cs);
   
         //status and exit don't take args, so we can skip the arg loop
-        if(cs->builtin == -1 || cs->builtin == CASE_CD)
+        if(!(cs->builtin == CASE_STATUS || cs->builtin == CASE_EXIT))
         {
-          int argcnt = 0; 
-          while( ( (tkstart = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
+          int argcnt, pid_sub;
+          argcnt = pid_sub = 0; 
+          while( ( (tkarg = strtok_r(NULL, delims, tks)) != NULL ) && argcnt < ARGS_MAX)
           { 
-            len = strlen(tkstart);
-            //to be freed in free_cmd_struct() 
-            cs->cmd_args[argcnt] = malloc(len+1);
-            if(cs->cmd_args[argcnt])
-            {
-              strcpy(cs->cmd_args[argcnt], tkstart);
+            len = strlen(tkarg);
+            //need to check for $$ and sub. here, or realloc within the arg array later 
+            if((pid_sub = check_pid(cs, tkarg, argcnt)) == 0 )
+            { 
+              //to be freed in free_cmd_struct() 
+              cs->cmd_args[argcnt] = malloc(len+1);
+              if(cs->cmd_args[argcnt])
+              {
+                strcpy(cs->cmd_args[argcnt], tkarg);
+              }
+              check_redir(cs, argcnt);
             }
-            check_arg(cs, argcnt);
             argcnt++;   
           }
           cs->cmd_argc = argcnt;
@@ -196,38 +130,35 @@ void prompt_user()
   fflush(stdout);
 }
 
+int STOPPED;
 
 int main(int argc, char *argv[])
 {
+  STOPPED = 0;
   //why not do this instead of repeated calls to fflush()?
-  //setbuf(stdin, NULL);
   //setbuf(stdout, NULL);
 
+  //set the default process mask (accept SIGCHLD, SIGINT and block rest)
+  set_smsh_mask();
+  
   //register signal handlers
-  //reg_handlers();
+  reg_smsh_handlers();
  
   //better to do Cmd *cs = calloc(sizeof(Cmd)) and keep everything in the heap?
   Cmd cs = {0};
 
   //pass this to fg process handler and status builtin
-  Fgexit fge = {0};
+  Fgexit fge = {INT_MIN, INT_MIN};
 
+  //TODO: must be passed to SIGTSTP handler or modified using results thereof
   //use a bitfield to track state
   State st = {0};
-
-  int sigtstp = 0;
-  //intended to hold pids if I'm incapable of coding SIGCHLD listener 
-  int pid_arr[RLIMIT_NPROC] = {0};
 
   do 
   {
     //reset the cmd struct
     init_cmd_struct(&cs);
-   
-    if(false)
-    {
-      //display child background process termination
-    }
+
     prompt_user();
     parse_cmdline( &cs ); 
     if(DEBUG){ print_cmd_struct(&cs);}
@@ -245,7 +176,7 @@ int main(int argc, char *argv[])
           st.builtin_cmd = 1;
           st.fg_cmd = st.bg_cmd = 0;
           case CASE_EXIT:
-            run_exit(pid_arr);
+            run_exit(cs);
             break;
           case CASE_CD:
             run_cd(&cs);
@@ -255,35 +186,64 @@ int main(int argc, char *argv[])
             break;
           default:
             fprintf(stderr, "No builtin with that name. Exiting.");
-            exit(-666);
+            exit(-1);
             break;
         }
       }
-      //cannot run in bg if flag for SIGTSTP was toggled on
-      else if(cs.bg && !sigtstp)
-      {
-        //set state, assuming we will run a background cmd
-        st.bg_cmd = 1;
-        st.fg_cmd = st.builtin_cmd = 0;
-        //run_bg_proc()
-      }
-      //check for bg char sets cs.bg to 0 on failure
-      else if(!cs.bg)
-      {
-        //set state, assuming we will run a foreground cmd
-        st.fg_cmd = st.fg_init = 1;
-        st.bg_cmd = st.builtin_cmd = 0;
-        run_fg_child(&cs, &fge);
-      }
       else
       {
-        fprintf(stderr, "No matching command or function. Exiting");
-        exit(-666);
+        //this is awkward, but we must wait to reset status until
+        //we're sure that the status builtin hasn't been called 
+        fge.status = fge.signal = INT_MIN;
+      
+        //cannot run in bg if flag for SIGTSTP was toggled on
+        if(cs.bg)
+        {
+          if(STOPPED)
+          {
+            /* set bg to 0 and exit this block, entering the next to run as an
+             * fg command */ 
+            cs.bg = 0;
+          }
+          else
+          {
+            //set state, assuming we will run a background cmd
+            st.bg_cmd = 1;
+            st.fg_cmd = st.builtin_cmd = 0;
+            run_bg_child(&cs);
+          }
+        }
+        //check for bg char sets cs.bg to 0 on failure
+        if(!cs.bg)
+        {
+          /* Kerrisk advises the use of sigsuspend for this scenario (pp464-467),
+           * but what if there is no bg process to produce SIGCHLD? Then 
+           * wouldn't the smallsh parent remain paused indefinitely? 
+           */
+          sigset_t orig_mask, chld_mask;
+          sigemptyset(&chld_mask);
+          //neither SIGCHLD nor SIGTSTP should interrupt the fg command 
+          sigaddset(&chld_mask, SIGTSTP);
+          sigaddset(&chld_mask, SIGCHLD);
+          if(sigprocmask(SIG_BLOCK, &chld_mask, &orig_mask) == -1)
+            perror("Failed to set SIGCHLD mask before fg process");
+
+          //set state, assuming we will run a foreground cmd
+          st.fg_cmd = st.fg_init = 1;
+          st.bg_cmd = st.builtin_cmd = 0;
+          run_fg_child(&cs, &fge);
+
+          /* we come back from the FG process (hopefully), and unblock the SIGCHLD
+           * signal.*/
+          if(sigprocmask(SIG_SETMASK, &orig_mask, NULL) == -1)
+            perror("Failed to reset smallsh procmask after fg exit");
+
+        }
       }
     }
   }
   while(true);
-  //TODO - ojo
+  
   free_cmd_struct(&cs);
 
   return 0;

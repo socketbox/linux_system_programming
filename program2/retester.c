@@ -7,7 +7,24 @@
 #define MATCH_CNT   4
 
 
-void print_matches(regmatch_t matches[])
+void print_raw_matches(char *str, regmatch_t matches[])
+{
+  printf("Regexec successful.\n");
+  int i = 0; 
+  printf("String length: %i\n", strlen(str)); 
+  for(; i < MATCH_CNT; i++)
+  {
+    if(i == 0)
+      printf("Whole string: %s\n", str+matches[0].rm_so);
+    printf("Match %i:\n", i);
+    printf("Match %i rm_so: %i\n", i, matches[i].rm_so);
+    printf("Match %i rm_eo: %i\n", i, matches[i].rm_eo);
+    printf("----------\n"); 
+  }
+}
+
+
+void print_matches(char* str, regmatch_t matches[])
 {
   printf("Regexec successful.\n");
   int i = 0; 
@@ -37,7 +54,6 @@ int main(int argc, char *argv[])
   int matchcnt = -1;
 
   char *errbuff;
-  
   printf("Trying to match with basic regex...\n");
   int compret = -2;
   if((compret = regcomp(&compreg, pat, 0)) == 0)
@@ -76,7 +92,6 @@ int main(int argc, char *argv[])
     regerror(compret, &compreg, errbuff, errbuffsz);
     fprintf(stderr, "Regexec error: %s\n", errbuff);
   }
-
   //reset the buffers
   memset(&compreg, 0, sizeof(regex_t));
   memset(&matches, 0, MATCH_CNT*sizeof(regmatch_t));
@@ -91,7 +106,7 @@ int main(int argc, char *argv[])
     int execret = -2; 
     if((execret = regexec(&compreg, str, matchcnt, matches, 0)) == 0)
     {
-      print_matches(matches);
+      print_raw_matches(str, matches);
     }
     else if(execret != 0)
     {

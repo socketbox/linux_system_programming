@@ -3,10 +3,19 @@
 
 #define ARGS_MAX			512
 
+#ifndef SIGDEBUG
+#define SIGDEBUG					0
+#endif
+
+
 #ifndef DEBUG
 #define DEBUG					0
 #endif
 
+
+/* Serves as a bit field for the purposes of tracking execution state.
+ * Used/evaluated by the status builtin and the SIGTSTP hanlder.
+ */
 typedef struct state
 {
   unsigned int fg_init			: 1;
@@ -16,6 +25,7 @@ typedef struct state
 } State;
 
 
+/* Holds exit status or terminating signal number for foreground processes */
 typedef struct fgexit
 {
   int status;
@@ -23,6 +33,7 @@ typedef struct fgexit
 } Fgexit;
 
 
+/* Contains the parsed command line and flags associated with redirection */
 typedef struct cmd
 {
 	//is this a comment?

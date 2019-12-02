@@ -1,38 +1,75 @@
 #!/bin/bash
 STD="-std=gnu11"
-DBGSYM="-Og -ggdb3"
-WFLAGS="-Wall -pedantic -Wno-missing-braces"
-DFLAG="-DDEBUG=1"
-if [[ "$1" = DEBUG ]] 
+WFLAGS="-Wall -pedantic"
+DFLAG=""
+SIGDBG=""
+OPTIM=""
+
+#begin
+if [[ "$1" = "--clean" ]] 
 then
-	echo "DEBUG profile"
-elif [[ "$1" = "-g" ]] 
-then
-	echo "GBD profile"
-	DFLAG=""
-	echo "DFLAG: $DFLAG"
-elif [[ "$1" == PROD ]] 
-then 
-	echo "PROD profile"
-	DFLAG=""
-	echo "DFLAG: $DFLAG"
-	DBGSYM=""
-fi
-rm -f ./*.o
-rm -f ./smallsh 
-echo "Values--STD: $STD; DFLAG: $DFLAG; DBGSYM: $DBGSYM"
-gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c cmdstruct.c
-gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshbuiltin.c
-gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshchild.c
-gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshregex.c
-gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -c smshsignals.c
-echo "gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o
-./smshregex.o ./cmdstruct.o ./smallsh.c"
-gcc $STD $WFLAGS $DBGSYM -I. $DFLAG -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c
-if [[ "$1" = "-g" ]]
-then
-	if [[ "$2" = "-x" ]]
-		then
-			gdb ./smallsh
+	echo "cleaning up"
+	rm -f \*.o \*.out \*.test
+else
+	echo "Running 'ctags -R *'"
+	ctags -R ./*
+  #	
+	# SIGDEBUG
+	#
+	if [[ "$1" = "--sigdebug" ]] 
+	then
+		echo "SIGDEBUG profile"
+		SIGDBG="-DSIGDEBUG=1"
+		DBGSYM="-ggdb3"
+  #	
+	# DEBUG
+	#
+	elif [[ "$1" = "--debug" ]] 
+	then
+		echo "DEBUG profile"
+		DBGSYM="-ggdb3"
+		DFLAG="-DDEBUG=1"
+  #	
+	# GDB
+	#
+	elif [[ "$1" = "--gdb" ]] 
+	then
+		echo "GBD profile"
+		DBGSYM="-ggdb3"
+  #	
+	# PROD
+	#
+	elif [[ "$1" == PROD ]] 
+	then 
+		echo "PROD profile"
+		OPTIM="-O3"	
 	fi
-fi
+	
+	rm -f ./*.o
+	rm -f ./smallsh 
+	
+	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c signal_functions.c
+	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c cmdstruct.c
+	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshbuiltin.c
+	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshchild.c
+	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshregex.c
+	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshsignals.c
+
+	echo STD: "$STD"
+	echo WFLAGS: "$WFLAGS"
+	echo DBGSYM: "$DBGSYM"
+	echo SIGDBG: "$SIGDBG"
+	echo DFLAG: "$DFLAG"
+	echo OPTIM: "$OPTIM"
+	
+	gcc $STD $OPTIM $WFLAGS $DBGSYM $DFLAG $SIGDBG -I. -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c
+
+	if [[ "$1" = "-g" ]]
+	then
+		if [[ "$2" = "-x" ]]
+			then
+				gdb ./smallsh
+		fi
+	fi
+
+fi #end

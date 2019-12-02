@@ -1,79 +1,132 @@
 #include <stdlib.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
 #include "smshsignals.h"
+#include "cmdstruct.h"
 
+int STOPPED;
 
-#ifndef DEBUG
-#define DEBUG   0
-#endif 
-
-
-/*void reg_handler(int sig)
+void set_smsh_mask()
 {
-  struct sigaction sa; 
-  build_action(sig, &sa);
-
-  sigaction(sig, , NULL);
-}
-*/
-
-
-void handle_int(int sig)
-{
-  if(DEBUG){write(STDOUT_FILENO, "In handle_int...\n", 17);}
+  sigset_t not_tstp;                                      
+  sigfillset(&not_tstp);                                  
+  //remove SIGTSTP since we want to catch and act on it   
+  sigdelset(&not_tstp, SIGTSTP);                          
+  //remove SIGCHLD
+  sigdelset(&not_tstp, SIGCHLD);                          
+  if(sigprocmask(SIG_SETMASK, &not_tstp, NULL) == -1)
+      perror("Setting proc. mask for smsh failed");
 }
 
-
-void handle_chld(int sig)
+void set_fg_mask()
 {
-  if(DEBUG){write(STDOUT_FILENO, "In handle_chld...\n", 18);}
-  /*
-WIFEXITED is a special macro used to evaluate the child exit status returned from wait() and waitpid(). If it returns a non-zero value then the child process exited normally. The WEXITSTATUS macro indicates the actual exit cause, but only if the child exited normally (see p546 of Kerrisk).
-However, WIFSIGNALED and WTERMSIG are used if the process exited due to a signal.
-   */
-  //Kerrisk, p556
-  while(waitpid(-1, NULL, WNOHANG) > 0)
-    continue;
+  sigset_t just_tstp;                                      
+  //remove all signals except SIGTSTP; we don't want fg processes stopped
+  sigemptyset(&just_tstp);                                  
+  sigaddset(&just_tstp, SIGTSTP);                          
+  if(sigprocmask(SIG_SETMASK, &just_tstp, NULL) == -1)
+      perror("Setting proc. mask for fg proc failed");
+}
+
+void set_bg_mask()
+{
+  sigset_t intntstp;                                      
+  //remove all signals except SIGTSTP and SIGINT
+  sigemptyset(&intntstp);                                  
+  sigaddset(&intntstp, SIGTSTP);                          
+  sigaddset(&intntstp, SIGINT);                          
+  if(sigprocmask(SIG_SETMASK, &intntstp, NULL) == -1)
+      perror("Setting proc. mask for bg proc failed");
 }
 
 
-void reg_handlers()
+void smsh_chld_hndlr(int sig, siginfo_t *sigi, void *ucontext)
 {
-  struct sigaction SIGINT_action = {0};
-  struct sigaction SIGCHLD_action = {0};
-  struct sigaction SIGTSTP_action = {0};
-  struct sigaction ignore_action = {0};
+  //Kerrisk, pp556-559
+  int cpid = 0;
+  int em = INT_MAX; 
+  int status = INT_MAX; 
+  if(SIGDEBUG)
+  {
+    fprintf(stderr, "smsh_chld_hndlr, before cpid eval: cpid=%i; exit status %i from %i\n", \
+        cpid, sigi->si_pid, sigi->si_status);
+    perror("waitpid in amsh_chld_hndlr returned error");
+  }
+  while((cpid = waitpid(-1, &em, WNOHANG)) > 0)
+  {
+    if(SIGDEBUG)
+      fprintf(stderr, "smsh_chld_hndlr, after waitpid: cpid=%i; exit status %i from %i\n", \
+          cpid, sigi->si_pid, sigi->si_status);
 
-  //SIGCHLD
-  SIGCHLD_action.sa_handler = handle_chld;
-  sigfillset(&SIGCHLD_action.sa_mask);
-  SIGCHLD_action.sa_flags = 0;
-  sigaction(SIGCHLD, &SIGCHLD_action, NULL);
+    if (WIFEXITED(em))
+    {
+      if(DEBUG){fprintf(stderr, "The process exited normally\n");}
+      status = WEXITSTATUS(em);
+      fprintf(stderr, "background pid %i is done: exit value %i\n", cpid, status);
+    }
+    else if(WIFSIGNALED(em))
+    {
+      status = WTERMSIG(em);
+      fprintf(stderr, "terminated by signal %i\n", status);
+    }
+  }
+}
 
-  //SIGINT
-  SIGINT_action.sa_handler = handle_int;
-  sigfillset(&SIGINT_action.sa_mask);
-  SIGINT_action.sa_flags = 0;
-  sigaction(SIGINT, &SIGINT_action, NULL);
 
-  //ignore
-  ignore_action.sa_handler = SIG_IGN;
-  sigaction(SIGTERM, &ignore_action, NULL);
-  sigaction(SIGHUP, &ignore_action, NULL);
-  sigaction(SIGSEGV, &ignore_action, NULL);
-  sigaction(SIGQUIT, &ignore_action, NULL);
+void smsh_tstp_hndlr(int sig, siginfo_t *sigi, void *ucontext)
+{
+  if(SIGDEBUG)
+    fprintf(stderr, "shsh_tstp_hndlr: from %i\n, exit status: %i", \
+        sigi->si_pid, sigi->si_status);
+
+  if(!STOPPED)
+  {
+    char *msg1 = "Entering foreground-only mode (& is now ignored)\n";
+    write(STDOUT_FILENO, msg1, 50);
+    STOPPED=1;
+  }
+  else
+  {
+    char *msg2 = "Exiting foreground-only mode\n";
+    write(STDOUT_FILENO, msg2, 30);
+    STOPPED=0;
+  }
+}
+
+
+void reg_smsh_handlers()
+{
+  //create and assign handler to SIGTSTP
+  struct sigaction smsh_act = {{0}};
+  
+  sigset_t hndl_tstp;
+  sigfillset(&hndl_tstp);
+  //we want to not block SIGCHLD sigdelset(&hndl_tstp, SIGTSTP);
+  //sigdelset(&hndl_tstp, SIGCHLD);
+  smsh_act.sa_mask = hndl_tstp;
+  
+  smsh_act.sa_sigaction = smsh_tstp_hndlr;
+  smsh_act.sa_flags = SA_SIGINFO;
+
+  sigaction(SIGTSTP, &smsh_act, NULL);
+
+  //create and assign handler to SIGCHLD
+  struct sigaction smsh_actchld = {{0}};
+  
+  sigset_t hndl_chld;
+  sigfillset(&hndl_chld);
+  //sigdelset(&hndl_chld, SIGTSTP);
+  sigdelset(&hndl_chld, SIGCHLD);
+  smsh_actchld.sa_mask = hndl_chld;
+  
+  smsh_actchld.sa_sigaction = smsh_chld_hndlr;
+  smsh_actchld.sa_flags = SA_SIGINFO;
+
+  if(sigaction(SIGCHLD, &smsh_actchld, NULL) == -1)
+    perror("Call to sigaction failed to register SIGCHLD handler");
 
 }
-/*
-SIGUSR2_action.sa_handler = catchSIGUSR2;
-sigfillset(&SIGUSR2_action.sa_mask);
-SIGUSR2_action.sa_flags = 0;
-printf("SIGTERM, SIGHUP, and SIGQUIT are disabled.\n");
-printf("Send a SIGUSR2 signal to kill this program.\n");
-printf("Send a SIGINT signal to sleep 5 seconds, then kill this program.\n");
-while(1)
-pause();*/

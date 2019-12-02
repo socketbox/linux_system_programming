@@ -33,7 +33,7 @@ void init_cmd_struct(Cmd *cs)
   cs->redir_out = INT_MIN;
   cs->pidarg = INT_MIN;
   cs->pidarg_idx = INT_MIN;
-  cs->cmd_argc = INT_MIN;
+  cs->cmd_argc = 0;
   cs->the_cmd = NULL;
   for(int x=0; x<ARGS_MAX; x++){ cs->cmd_args[x] = NULL;}
 }
