@@ -8,7 +8,7 @@
 #include "protocol.h"
 
 
-char* recv_enc_bytes(int socket, int buffsz)
+char* recv_bytes(int socket, int buffsz)
 {
   char *buff = calloc(buffsz, sizeof(char));
   int recvd = INT_MIN;

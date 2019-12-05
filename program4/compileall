@@ -32,4 +32,6 @@ gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c srvr_common.c
 gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c clnt_common.c
 gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. clnt_common.o -o otp_enc otp_enc.c
 gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. srvr_common.o -o otp_enc_d otp_enc_d.c 
+gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. clnt_common.o -o otp_dec otp_dec.c
+gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. srvr_common.o -o otp_dec_d otp_dec_d.c 
 

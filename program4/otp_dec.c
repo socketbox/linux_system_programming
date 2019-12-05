@@ -61,9 +61,9 @@ int main(int argc, char *argv[])
 	struct hostent* serverHostInfo;
    
   // Check usage & args 
-	if (argc < 4) { fprintf(stderr,"USAGE: %s plaintext_file key_file port\n", argv[0]); exit(0); } 
+	if (argc < 4) { fprintf(stderr,"USAGE: %s cyphertext_file key_file port\n", argv[0]); exit(0); } 
 
-  int ptfsz = verify_file(argv[1]);
+  int cyptfsz = verify_file(argv[1]);
   int kfsz = verify_file(argv[2]);
 	
   // Set up the server address struct
@@ -84,14 +84,14 @@ int main(int argc, char *argv[])
 		error("CLIENT: ERROR connecting");
 
   //Identify ourselves to server
-  send_client_type(socketFD, ENCC);
+  send_client_type(socketFD, DECC);
   parse_response(socketFD);
 
-  //send plaintext 
-  send_file_size(socketFD, ptfsz);
+  //send cyphertext 
+  send_file_size(socketFD, cyptfsz);
   parse_response(socketFD);
   
-  send_file(socketFD, argv[1], ptfsz);
+  send_file(socketFD, argv[1], cyptfsz);
   parse_response(socketFD);
   
   //send key 
@@ -102,12 +102,12 @@ int main(int argc, char *argv[])
   parse_response(socketFD);
   
   //get cyphertext 
-  char *encbuff = NULL;
-  encbuff = recv_bytes(socketFD, ptfsz);
+  char *decbuff = NULL;
+  decbuff = recv_bytes(socketFD, cyptfsz);
   if(DEBUG){fprintf(stderr, "%s", "otp_enc: after recv_bytes\n");}
 
   //print out encbytes!
-  fprintf(stdout, "%s", encbuff);
+  fprintf(stdout, "%s", decbuff);
   
   //we're closing in the parent, so this shouldn't be necessary  
   shutdown(socketFD, SHUT_WR);
