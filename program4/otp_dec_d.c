@@ -14,8 +14,9 @@ char* decrypt_buffers(char *ct, char *key, int buffsz)
 {
   if(DEBUG){ fprintf(stderr, "otp_dec_d: decrypt_buffers buffsz: %i\n", buffsz); }
   char *decd = calloc(buffsz, sizeof(char));
-  signed int diffc, tmp0, tmp1, tmp2, tmp3, tmp4;
-  tmp0 = tmp1 = tmp2 = tmp3 = tmp4 = diffc = 0;
+  signed int diffc, tmp0, tmp1, tmp2, tmp3, tmp5;
+  tmp0 = tmp1 = tmp2 = tmp3 = tmp5 = diffc = 0;
+  float tmp4 = 0.0; 
   //https://stackoverflow.com/questions/10133194/reverse-modulus-operator 
   for(int i=0; i<buffsz; i++)
   {
@@ -28,13 +29,15 @@ char* decrypt_buffers(char *ct, char *key, int buffsz)
       tmp1 = tmp0 - 65;
       tmp2 = (*(key+i) + 65);
       tmp3 = (tmp1 - tmp2);
-      tmp4 = tmp3 % 27;
-      diffc = 27 + tmp4 + 65;
-      if(DEBUG){ fprintf(stderr, "otp_dec_d: in decrypt_buffers tmp1, tmp2, tmp3, tmp4, diffc:\
-          %i; %i; %i; %i; %i\n", tmp1, tmp2, tmp3, tmp4, diffc); }
+      tmp4 = ceilf( fabs( (tmp3+.0)/27 ) );
+      tmp5 = tmp3 + (tmp4*27);
+      diffc = tmp5 + 65;
+      if(DEBUG){ fprintf(stderr, "otp_dec_d: in decrypt_buffers tmp1, tmp2, tmp3, tmp4, tmp5, diffc:\
+          %i; %i; %i; %f; %i; %i;", tmp1, tmp2, tmp3, tmp4, tmp5, diffc); }
       if(diffc == 91)
         diffc = 32;
       decd[i] = diffc; 
+      if(DEBUG){ fprintf(stderr, "%c\n", diffc); }
     }
   }
   decd[buffsz-1]='\n';

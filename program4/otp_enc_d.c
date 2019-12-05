@@ -14,16 +14,20 @@ char* encrypt_buffers(char *pt, char *key, int buffsz)
 {
   if(DEBUG){ fprintf(stderr, "otp_end_d: encrypt_buffers buffsz: %i\n", buffsz); }
   char *encd = calloc(buffsz, sizeof(char));
-  unsigned short sumc, tmp;
-  tmp = sumc = 0;
+  unsigned short sumc, tmp, tmp1;
+  tmp = tmp1 = sumc = 0;
   for(int i=0; i<buffsz; i++)
   {
     if(*(pt+i) != '\n')
     {
-      sumc = *(key+i) + *(pt+i); 
+      if(*(pt+i) == 32)
+        tmp1 = 91;
+      else
+        tmp1 = *(pt+i); 
+      sumc = *(key+i) + tmp1; 
       tmp = 65+(sumc % 27); 
       if(tmp == 91)
-      tmp = 32;
+        tmp = 32;
       encd[i] = tmp; 
     }
   }
