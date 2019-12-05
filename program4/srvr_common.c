@@ -79,36 +79,10 @@ int check_client(int cxfd, int client_type)
 }
 
 
-int get_file_len(char *preamb, int plen)
+int get_file_len(int cxfd)
 {
-  char c = ' ';
-  char len[plen];
-  memset(len, '\0', sizeof(char)*plen);
-
-  for(int i = 0; i < plen; i++)
-  {
-    c = *(preamb+i); 
-    if(isdigit(c) != 0)
-      len[i] = c;
-  }
-  int intlen = atoi(len); 
-  if(DEBUG){fprintf(stderr, "otp_?_d: in get_file_len; length == %i\n", intlen);}
-  return intlen;
-}
-
-
-/*
- * get a file
- */
-int get_clients_file(int cxfd, char **buff)
-{
-  if(DEBUG){fprintf(stderr, "%s\n", "otp_?_d: in get file");}
-  
-  int filelen, n;
-  filelen = n = INT_MIN;
-  char preamble[PREAMB_LEN] = {'\0'};
- 
   int recvd = INT_MIN; 
+  char preamble[PREAMB_LEN] = {'\0'};
   if((recvd = recv(cxfd, preamble, PREAMB_LEN, MSG_WAITALL)) < 1)  
   {
     fprintf(stderr, "%s\n", "Failed to obtain valid preamble from client. Exiting.");
@@ -116,16 +90,31 @@ int get_clients_file(int cxfd, char **buff)
     if(DEBUG){fprintf(stderr,"otp_?_d: preamble==%s\n", preamble);}
     exit(1);
   }
-  
-  filelen = get_file_len(preamble, PREAMB_LEN);
-  if(filelen <= 0 )
-  {
-    fprintf(stderr, "%s", "File length not given in preamble");
-    exit(1);
-  }
+  char c = ' ';
+  char len[PREAMB_LEN] = {'\0'};
 
+  for(int i = 0; i < PREAMB_LEN; i++)
+  {
+    c = *(preamble+i); 
+    if(isdigit(c) != 0)
+      len[i] = c;
+  }
+  int intlen = atoi(len); 
+  if(DEBUG){fprintf(stderr, "otp_?_d: in get_file_len; length == %i\n", intlen);}
+  return intlen;
+ 
+}
+
+
+/*
+ * get a file
+ */
+char* get_clients_file(int cxfd, int filelen)
+{
+  if(DEBUG){fprintf(stderr, "%s\n", "otp_?_d: in get file");}
+  
   //ready the buffer and notify the client
-  *buff = calloc(filelen, sizeof(char));
+  char *buff = calloc(filelen, sizeof(char));
   if(buff) 
     send_ready(cxfd); 
   else
@@ -134,19 +123,19 @@ int get_clients_file(int cxfd, char **buff)
     exit(1);
   }
   
-  recvd = n = 0;
+  int recvd = 0;
   //TODO Will this work without a loop for larger files? Should we set socket timeout w/ MSG_WAITALL
   /*while(filelen != recvd)
     {
       while((n = recv(cxfd, buff, filelen, 0)) > 0)
       recvd += n;
   */
-  fprintf(stderr, "s%\n", "HERE"); 
-  n = recv(cxfd, buff, filelen, MSG_WAITALL);
+  recvd = recv(cxfd, buff, filelen, MSG_WAITALL);
+  if(recvd == -1) perror("Receive Failed");
 
   if(DEBUG){fprintf(stderr, "otp_?_d: get_file; recvd and filelen: %i and %i\n", recvd, filelen);}
-  if(DEBUG){fprintf(stderr, "otp_?_d: get_file; buffer: %s\n", *buff);}
-  if(n != filelen)
+  if(DEBUG){fprintf(stderr, "otp_?_d: get_file; buffer: %s\n", buff);}
+  if(recvd != filelen)
   {
     send_error(cxfd, INC_STR, SRVR_RESP_LEN);
     recvd = 0;
@@ -155,7 +144,7 @@ int get_clients_file(int cxfd, char **buff)
     send_error(cxfd, SKTTO_STR, SRVR_RESP_LEN);
   //}
   send_ready(cxfd);
-  return filelen;
+  return buff;
 }
 
 

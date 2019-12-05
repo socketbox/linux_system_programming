@@ -10,16 +10,26 @@
 #include "srvr_common.h"
 
 
-void encrypt_buffers(char *pt, char *key, char **encd, int buffsz)
+char* encrypt_buffers(char *pt, char *key, int buffsz)
 {
-  encd = calloc(buffsz, sizeof(char));
-  unsigned short sumc = 0;
+  if(DEBUG){ fprintf(stderr, "otp_end_d: encrypt_buffers buffsz: %i\n", buffsz); }
+  char *encd = calloc(buffsz, sizeof(char));
+  unsigned short sumc, tmp;
+  tmp = sumc = 0;
   for(int i=0; i<buffsz; i++)
   {
-    sumc = *(key+i) + **(encd+i);
-    *(encd[i]) = sumc % 27; 
+    if(*(pt+i) != '\n')
+    {
+      sumc = *(key+i) + *(pt+i); 
+      tmp = 65+(sumc % 27); 
+      if(tmp == 91)
+      tmp = 32;
+      encd[i] = tmp; 
+    }
   }
-  if(DEBUG){ fprintf(stderr, "otp_end_d: encrypted buffer: %s\n", *encd); }
+  encd[buffsz-1]='\n';
+  if(DEBUG){ fprintf(stderr, "otp_end_d: encrypted buffer: %s", encd); }
+  return encd;
 }
 
 void error(const char *msg) { perror(msg); exit(1); } // Error function used for reporting issues
@@ -73,24 +83,26 @@ int main(int argc, char *argv[])
         //setup 
         int bfsz, keybfsz;
         bfsz = keybfsz = INT_MIN;
-        char **ptbuff, **keybuff, **cypherbuff;
+        char *ptbuff, *keybuff, *cypherbuff;
         keybuff = ptbuff = cypherbuff = NULL;
-
         //ensure client is otp_enc
         check_client(cxfd, ENCC); 
+        //above call sends ready if client is ENCC 
         //get plaintext
-        bfsz = get_clients_file(cxfd, ptbuff); 
-        if(DEBUG){fprintf(stderr, "otp_enc_d: plaintext received == %s\n", *ptbuff);}
+        bfsz = get_file_len(cxfd);
+        ptbuff = get_clients_file(cxfd, bfsz); 
+        if(DEBUG){fprintf(stderr, "otp_enc_d: plaintext received == %s\n", ptbuff);}
         //get key
-        keybfsz = get_clients_file(cxfd, keybuff); 
+        keybfsz = get_file_len(cxfd);
+        keybuff = get_clients_file(cxfd, keybfsz); 
         //check keysize 
         if( keybfsz < bfsz ) error("Key of insufficient size.");
         
         //encrypt plaintext 
         if(DEBUG){fprintf(stderr, "%s", "otp_enc_d: before encrypt\n");}
-        if(DEBUG){fprintf(stderr, "otp_enc_d: ptbuff== %s\n", *ptbuff);}
-        if(DEBUG){fprintf(stderr, "otp_enc_d: keybuff== %s\n", *keybuff);}
-        encrypt_buffers(*ptbuff, *keybuff, cypherbuff, bfsz);
+        if(DEBUG){fprintf(stderr, "otp_enc_d: ptbuff== %s\n", ptbuff);}
+        if(DEBUG){fprintf(stderr, "otp_enc_d: keybuff== %s\n", keybuff);}
+        cypherbuff = encrypt_buffers(ptbuff, keybuff, bfsz);
         //send cyphertext
         send(cxfd, cypherbuff, bfsz, 0);
         

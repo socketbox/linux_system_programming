@@ -8,6 +8,7 @@ typedef struct child_processes
 } Children;
 
 int check_client(int sock, int client_type);
-int get_clients_file(int sock, char **buffer);
+char* get_clients_file(int sock, int filesz);
+int get_file_len(int cxfd);
 
 #endif

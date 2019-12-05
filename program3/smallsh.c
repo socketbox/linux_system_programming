@@ -10,7 +10,6 @@
 #include "cmdstruct.h"
 #include "smshsignals.h"
 #include "smshchild.h"
-#include "signal_functions.h"
 
 #define CASE_PID          164 
 #define CASE_RDSTDOUT     62

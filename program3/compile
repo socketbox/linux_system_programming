@@ -1,18 +1,17 @@
 #!/bin/bash
 STD="-std=gnu11"
 WFLAGS="-Wall -pedantic"
-DFLAG=""
-SIGDBG=""
-OPTIM=""
 
 #begin
 if [[ "$1" = "--clean" ]] 
 then
 	echo "cleaning up"
-	rm -f \*.o \*.out \*.test
-else
+	rm -f *.o *.out *.test junk* smallsh
+elif [[ "$1" = "--ctags" ]]
+then
 	echo "Running 'ctags -R *'"
 	ctags -R ./*
+else
   #	
 	# SIGDEBUG
 	#
@@ -39,8 +38,7 @@ else
   #	
 	# PROD
 	#
-	elif [[ "$1" == PROD ]] 
-	then 
+	else
 		echo "PROD profile"
 		OPTIM="-O3"	
 	fi
@@ -48,12 +46,11 @@ else
 	rm -f ./*.o
 	rm -f ./smallsh 
 	
-	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c signal_functions.c
-	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c cmdstruct.c
-	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshbuiltin.c
-	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshchild.c
-	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshregex.c
-	gcc $STD $WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshsignals.c
+	gcc $STD $OPTIM	$WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c cmdstruct.c
+	gcc $STD $OPTIM	$WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshbuiltin.c
+	gcc $STD $OPTIM	$WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshchild.c
+	gcc $STD $OPTIM	$WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshregex.c
+	gcc $STD $OPTIM	$WFLAGS $DBGSYM -I. $SIGDBG $DFLAG -c smshsignals.c
 
 	echo STD: "$STD"
 	echo WFLAGS: "$WFLAGS"
@@ -61,6 +58,8 @@ else
 	echo SIGDBG: "$SIGDBG"
 	echo DFLAG: "$DFLAG"
 	echo OPTIM: "$OPTIM"
+	#echo "gcc $STD $OPTIM $WFLAGS $DBGSYM $DFLAG $SIGDBG -I. -o smallsh ./smshchild.o ./smshsignals.o\
+		#./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c"
 	
 	gcc $STD $OPTIM $WFLAGS $DBGSYM $DFLAG $SIGDBG -I. -o smallsh ./smshchild.o ./smshsignals.o ./smshbuiltin.o ./smshregex.o ./cmdstruct.o ./smallsh.c
 

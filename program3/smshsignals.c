@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -7,6 +8,8 @@
 #include <unistd.h>
 #include "smshsignals.h"
 #include "cmdstruct.h"
+
+#define PID_MAX_LEN   5
 
 int STOPPED;
 
@@ -66,7 +69,16 @@ void smsh_chld_hndlr(int sig, siginfo_t *sigi, void *ucontext)
     {
       if(DEBUG){fprintf(stderr, "The process exited normally\n");}
       status = WEXITSTATUS(em);
-      fprintf(stderr, "background pid %i is done: exit value %i\n", cpid, status);
+      //fprintf(stderr, "background pid %i is done: exit value %i\n", cpid, status);
+      char *msg1 = "background pid ";
+      //pid + spaces + null
+      char msg2[PID_MAX_LEN+1] = {'\0'};
+      char *msg3 = " is done: exit value ";
+   
+      write(STDOUT_FILENO, msg1, 15);
+      write(STDOUT_FILENO, msg2, 5);
+      write(STDOUT_FILENO, msg3, 22);
+      write(STDOUT_FILENO, "msg3, 22);
     }
     else if(WIFSIGNALED(em))
     {

@@ -33,8 +33,8 @@ void parse_response(int cxfd)
 {
   int recvd = INT_MIN;
   char resp[SRVR_RESP_LEN] = {'\0'};
-  recvd = recv(cxfd, resp, SRVR_RESP_LEN, 0);
-  fprintf(stderr, "REceived: %i. Exiting.\n", recvd); 
+  recvd = recv(cxfd, resp, SRVR_RESP_LEN, MSG_WAITALL);
+  fprintf(stderr, "Received: %i in response\n", recvd); 
   //if((recvd = recv(cxfd, resp, SRVR_RESP_LEN, 0)) > 0)
   if(recvd > 0) 
   {
@@ -102,17 +102,16 @@ int main(int argc, char *argv[])
   parse_response(socketFD);
   
   //get cyphertext 
-  char encbuff[ptfsz];
-  memset(encbuff, '\0', ptfsz);
-  recv_enc_bytes(socketFD, encbuff, ptfsz);
+  char *encbuff = NULL;
+  encbuff = recv_enc_bytes(socketFD, ptfsz);
   if(DEBUG){fprintf(stderr, "%s", "otp_enc: after recv_enc_bytes\n");}
 
   //print out encbytes!
-  puts(encbuff);
+  fprintf(stdout, "%s", encbuff);
   
   //we're closing in the parent, so this shouldn't be necessary  
-  //shutdown(socketFD, SHUT_WR);
-  //close(socketFD);
+  shutdown(socketFD, SHUT_WR);
+  close(socketFD);
 	return 0;
 }
 

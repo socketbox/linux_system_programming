@@ -8,13 +8,14 @@
 #include "protocol.h"
 
 
-int recv_enc_bytes(int socket, char *buff, int buffsz)
+char* recv_enc_bytes(int socket, int buffsz)
 {
+  char *buff = calloc(buffsz, sizeof(char));
   int recvd = INT_MIN;
   recvd = recv(socket, buff, buffsz, MSG_WAITALL);
   if(recvd != buffsz)
     fprintf(stderr, "Error: received unanticipated number of cyphtertext bytes (%i)\n", recvd);
-  return recvd;
+  return buff;
 }
 
 
