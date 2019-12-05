@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-DFLAG=""
+DFLAGS=""
+OFLAG=""
 
 if [[ "$1" == '-c' ]]
 then
 	echo "CLEAN"
-	rm -f keygen
-	rm -f ./*.o
+	rm -f ./*.o keygen otp_enc otp_enc_d
+	exit 0
 fi
 
 if [[ "$1" == '-t' ]]
@@ -13,21 +14,22 @@ then
 	echo "CTAGS/CSCOPE"
 	ctags -R ./*
 	cscope -R -b
+	exit 0
 fi
 
 if [[ "$1" == '-g' ]]
 then
 	echo "DEBUG"
-	DFLAG="-DDEBUG"
-	rm -f ./*.o keygen	
-	gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. -o keygen.c
-	#gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. -o ftserver ftserver.c
+	DFLAGS="-DDEBUG=1 -g3"
+	OFLAG="-Og"
+	#gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. -o keygen keygen.c
+	#gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. -c srvr_common.c
+	#gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. srvr_common.o -o otp_enc_d otp_enc_d.c
 fi
 
-if [[ "$#" -eq 0 ]]
-then
-	rm -f ./*.o keygen	
-	gcc -std=gnu11 -O3 -Wall -pedantic -I. -o keygen keygen.c
-	#gcc -std=gnu11 -O3 -Wall -pedantic -I. -o ftserver ftserver.c
-fi
+gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -o keygen keygen.c
+gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c srvr_common.c
+gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c clnt_common.c
+gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. clnt_common.o -o otp_enc otp_enc.c
+gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. srvr_common.o -o otp_enc_d otp_enc_d.c 
 

@@ -1,11 +1,13 @@
 #ifndef SRVR_COMMON_H
 #define SRVR_COMMON_H
 
-#define MSG_LEN_BYTES   sizeof(uint32_t) 
-#define MSG_END         @@
-#define OTP_ENC_ID      ENCC
-#define PREAMB_LEN      12
+typedef struct child_processes
+{
+	int count;
+	pid_t kids[5];
+} Children;
 
-
+int check_client(int sock, int client_type);
+int get_clients_file(int sock, char **buffer);
 
 #endif
