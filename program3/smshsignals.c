@@ -78,7 +78,7 @@ void smsh_chld_hndlr(int sig, siginfo_t *sigi, void *ucontext)
       write(STDOUT_FILENO, msg1, 15);
       write(STDOUT_FILENO, msg2, 5);
       write(STDOUT_FILENO, msg3, 22);
-      write(STDOUT_FILENO, "msg3, 22);
+      write(STDOUT_FILENO, msg3, 22);
     }
     else if(WIFSIGNALED(em))
     {
