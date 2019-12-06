@@ -15,6 +15,9 @@
 #define INC										300
 #define RDY_STR								"READY"
 #define RDY										200
+#define INVCL									500	
+#define INVCL_STR							"INVCL"	
+#define SKTTO									590	
 #define SKTTO_STR							"SKTTO"
 #define SRVR_RESP_LEN					6 
 

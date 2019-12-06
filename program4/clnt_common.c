@@ -3,9 +3,39 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <limits.h>
 #include <sys/socket.h>
 #include "protocol.h"
+#include "base.h"
+
+
+void parse_response(int cxfd)
+{
+  int recvd = INT_MIN;
+  char resp[SRVR_RESP_LEN] = {'\0'};
+  recvd = recv(cxfd, resp, SRVR_RESP_LEN, MSG_WAITALL);
+  if(DEBUG){fprintf(stderr, "Received: %i in response\n", recvd); }
+  //if((recvd = recv(cxfd, resp, SRVR_RESP_LEN, 0)) > 0)
+  if(recvd > 0) 
+  {
+    if(strcmp(resp, INVCL_STR) == 0)
+    {
+      fprintf(stderr, "%s", "Fatal: attempted connection to wrong server type. Exiting.\n"); 
+      exit(2);
+    }
+    else if(strcmp(resp, RDY_STR) != 0)
+    {
+      fprintf(stderr, "Fatal: server did not send READY: code %s. Exiting.\n", resp); 
+      exit(1);
+    }
+  }
+  else
+  {
+    fprintf(stderr, "Fatal: received no response from server. Exiting.\n");
+    exit(1);
+  }
+}
 
 
 char* recv_bytes(int socket, int buffsz)

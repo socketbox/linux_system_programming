@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +9,7 @@
 #include <netinet/in.h>
 #include "protocol.h"
 #include "srvr_common.h"
-
+#include "base.h"
 
 char* encrypt_buffers(char *pt, char *key, int buffsz)
 {
@@ -36,12 +37,8 @@ char* encrypt_buffers(char *pt, char *key, int buffsz)
   return encd;
 }
 
-void error(const char *msg) { perror(msg); exit(1); } // Error function used for reporting issues
-
 int main(int argc, char *argv[])
 {
-  fprintf(stderr, "DEBUG: %i\n", DEBUG);
-
 	int listenSocketFD, cxfd, portNumber;
 	socklen_t sizeOfClientInfo;
 	struct sockaddr_in serverAddress, clientAddress;
@@ -69,10 +66,18 @@ int main(int argc, char *argv[])
 
 	// Accept a connection, blocking if one is not available until one connects
 	sizeOfClientInfo = sizeof(clientAddress); // Get the size of the address for the client that will connect
+  
+  //track children
+  Children rugrats = {0};
+
   while(1) 
   {
     cxfd = accept(listenSocketFD, (struct sockaddr *)&clientAddress, &sizeOfClientInfo); // Accept
     if (cxfd < 0) error("ERROR on accept");
+
+    //check to see if we're about to exceed number of children
+    if(1)
+      fprintf(stderr, "KIDS: %i\n", rugrats.count);
 
     if(DEBUG){fprintf(stderr, "%s\n", "otp_enc_d: accept loop.");} 
     pid_t spawn_pid = fork();
@@ -118,21 +123,14 @@ int main(int argc, char *argv[])
         break;   
       }
       default:
+      {
+        //put the spawn pid in the Children struct and increment
+        rugrats.kids[rugrats.count++] = spawn_pid;
         //close parent's copy of socket fd
         close(cxfd);
         break;
+      }
     } 
-    // Get the message from the client and display it
-    /*memset(buffer, '\0', 256);
-    charsRead = recv(establishedConnectionFD, buffer, 255, 0); // Read the client's message from the socket
-    if (charsRead < 0) error("ERROR reading from socket");
-    printf("SERVER: I received this from the client: \"%s\"\n", buffer);
-
-    // Send a Success message back to the client
-    charsRead = send(establishedConnectionFD, "I am the server, and I got your message", 39, 0); // Send success back
-    if (charsRead < 0) error("ERROR writing to socket");
-    //TODO this will not need to be done here, as we'll close the socket after spawning 
-    close(establishedConnectionFD); // Close the existing socket which is connected to the client*/
   }
   close(listenSocketFD); // Close the listening socket
 	return 0; 

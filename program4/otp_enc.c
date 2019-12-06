@@ -9,12 +9,9 @@
 #include <netdb.h> 
 #include "protocol.h"
 #include "clnt_common.h"
+#include "base.h"
 
 
-/**
- * 
- *  
- */
 void send_client_type(int cxfd, int type)
 {
   if(DEBUG){fprintf(stderr, "%s\n", "otp_enc: sending client type");}
@@ -29,31 +26,6 @@ void send_client_type(int cxfd, int type)
 }
 
 
-void parse_response(int cxfd)
-{
-  int recvd = INT_MIN;
-  char resp[SRVR_RESP_LEN] = {'\0'};
-  recvd = recv(cxfd, resp, SRVR_RESP_LEN, MSG_WAITALL);
-  fprintf(stderr, "Received: %i in response\n", recvd); 
-  //if((recvd = recv(cxfd, resp, SRVR_RESP_LEN, 0)) > 0)
-  if(recvd > 0) 
-  {
-    if(strcmp(resp, RDY_STR) != 0)
-    {
-      fprintf(stderr, "Fatal: server not ready; code %s. Exiting.\n", resp); 
-      exit(1);
-    }
-  }
-  else
-  {
-    fprintf(stderr, "Fatal: did not receive response from server. Exiting.\n");
-    exit(1);
-  }
-}
-
-
-void error(const char *msg) { perror(msg); exit(0); } // Error function used for reporting issues
-
 int main(int argc, char *argv[])
 {
 	int socketFD, portNumber;
@@ -65,7 +37,8 @@ int main(int argc, char *argv[])
 
   int ptfsz = verify_file(argv[1]);
   int kfsz = verify_file(argv[2]);
-	
+  if(kfsz < ptfsz){ error("Key file of insufficient length"); }
+  
   // Set up the server address struct
 	memset((char*)&serverAddress, '\0', sizeof(serverAddress)); // Clear out the address struct
 	portNumber = atoi(argv[3]); // Get the port number, convert to an integer from a string

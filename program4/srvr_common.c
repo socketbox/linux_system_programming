@@ -10,15 +10,6 @@
 #include "protocol.h"
 
 
-/*int set_socket_to(int cxfd, int milsecs)
-{
-  struct timeval tv;
-  tv.tv_sec = 0;
-  tv.tv_usec = 1000*milsecs;
-  return setsockopt(cxfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
-}*/
-
-
 void send_ready(int cxfd)
 {
   int sent = INT_MIN;
@@ -47,7 +38,7 @@ int check_client(int cxfd, int client_type)
     perror("Failed to obtain preamble from client.");
     exit(1);
   }
-  fprintf(stderr, "otp_%i_d: client type id == %s\n", client_type, client_type_id);
+  if(DEBUG){fprintf(stderr, "otp_%i_d: client type id == %s\n", client_type, client_type_id);}
   if(client_type == ENCC)
   {
     if(strstr(client_type_id, "ENCC"))
@@ -59,6 +50,7 @@ int check_client(int cxfd, int client_type)
     else
     {
       perror("Fatal: client is not otp_enc.");
+      send_error(cxfd, INVCL_STR, 6);
       exit(2);
     }
   }
@@ -72,6 +64,7 @@ int check_client(int cxfd, int client_type)
     else
     {
       perror("Fatal: client is not otp_dec.");
+      send_error(cxfd, INVCL_STR, 6);
       exit(2);
     }
   }
@@ -85,7 +78,7 @@ int get_file_len(int cxfd)
   char preamble[PREAMB_LEN] = {'\0'};
   if((recvd = recv(cxfd, preamble, PREAMB_LEN, MSG_WAITALL)) < 1)  
   {
-    fprintf(stderr, "%s\n", "Failed to obtain valid preamble from client. Exiting.");
+    if(DEBUG){fprintf(stderr, "%s\n", "Failed to obtain valid preamble from client. Exiting.");}
     if(DEBUG){fprintf(stderr,"otp_?_d: recvd==%i\n", recvd);}
     if(DEBUG){fprintf(stderr,"otp_?_d: preamble==%s\n", preamble);}
     exit(1);
