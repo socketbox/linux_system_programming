@@ -2,14 +2,40 @@
 DFLAGS=""
 OFLAG=""
 
+ARTIFACTS="keygen otp_enc otp_dec otp_enc_d otp_dec_d"
+PLAINTEXT="plaintext1 plaintext2 plaintext3 plaintext4 plaintext5"
+PLAINTEXTMOD="plaintext1 plaintext2 plaintext3 plaintext4 plaintext5 plaintext6 plaintext7"
+GSCRIPT="p4gradingscript"
+GSCRIPTMOD="p4_2gradingscript"
+
+ENCPORT="55660"
+DECPORT="55661"
+
+function compile()
+{
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -o keygen keygen.c
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c base.c
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c srvr_common.c
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c clnt_common.c
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. base.o clnt_common.o -o otp_enc otp_enc.c
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. base.o srvr_common.o -o otp_enc_d otp_enc_d.c 
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. base.o clnt_common.o -o otp_dec otp_dec.c
+	gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -lm -I. base.o srvr_common.o -o otp_dec_d otp_dec_d.c 
+}
+
+function clean()
+{
+	rm -f ./*.o keygen otp_enc otp_enc_d otp_dec otp_dec_d
+}
+
 if [[ "$1" == '-c' ]]
 then
 	echo "CLEAN"
-	rm -f ./*.o keygen otp_enc otp_enc_d
+	clean	
 	exit 0
 fi
 
-if [[ "$1" == '-t' ]]
+if [[ "$1" == '-a' ]]
 then
 	echo "CTAGS/CSCOPE"
 	ctags -R ./*
@@ -22,16 +48,35 @@ then
 	echo "DEBUG"
 	DFLAGS="-DDEBUG=1 -g3"
 	OFLAG="-Og"
-	#gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. -o keygen keygen.c
-	#gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. -c srvr_common.c
-	#gcc -std=gnu11 $DFLAG -Og -g3 -Wall -pedantic -I. srvr_common.o -o otp_enc_d otp_enc_d.c
+	compile
+	exit 0
 fi
 
-gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -o keygen keygen.c
-gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c srvr_common.c
-gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. -c clnt_common.c
-gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. clnt_common.o -o otp_enc otp_enc.c
-gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. srvr_common.o -o otp_enc_d otp_enc_d.c 
-gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -I. clnt_common.o -o otp_dec otp_dec.c
-gcc -std=gnu11 $OFLAG $DFLAGS -Wall -pedantic -lm -I. srvr_common.o -o otp_dec_d otp_dec_d.c 
+if [[ "$1" == '-t' ]]
+then
+	echo "TESTING"
+	rm -rf ./test
+	DFLAGS=""	
+	OFLAG="-O3"
+	compile
+	mkdir test
+	cp -f $ARTIFACTS $PLAINTEXT $GSCRIPT ./test
+	cd ./test
+	chmod u+x $GSCRIPT	
+	export PATH="$PATH:."	
+	./$GSCRIPT $ENCPORT $DECPORT
+fi
+
+if [[ "$1" == '' ]]
+then
+	OFLAG="-O3"
+	clean
+	compile
+fi
+
+if [[ "$1" == '-z' ]]
+then 
+	ZIPARGS="plaintext1 plaintext2 plaintext3 plaintext4 plaintext5 otp* p4gradingscript base.* clnt_* compileall keygen.c protocol.h srvr_*"
+	zip boettchc_cs344-400-f2019_program4.zip $ZIPARGS
+fi
 

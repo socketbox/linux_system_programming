@@ -12,6 +12,13 @@
 #include "srvr_common.h"
 #include "base.h"
 
+
+/**
+ * pre:   cyphertext and key have been read into buffers
+ * in:    char* to cyphertext and key buffers; the size of the PT buffer
+ * out:   a char* to the plaintext 
+ * post:  plaintext ready for transmission
+ */
 char* decrypt_buffers(char *ct, char *key, int buffsz)
 {
   if(DEBUG){ fprintf(stderr, "otp_dec_d: decrypt_buffers buffsz: %i\n", buffsz); }
@@ -19,27 +26,30 @@ char* decrypt_buffers(char *ct, char *key, int buffsz)
   signed int diffc, tmp0, tmp1, tmp2, tmp3, tmp5;
   tmp0 = tmp1 = tmp2 = tmp3 = tmp5 = diffc = 0;
   float tmp4 = 0.0; 
-  //https://stackoverflow.com/questions/10133194/reverse-modulus-operator 
+  //this was helpful: https://stackoverflow.com/questions/10133194/reverse-modulus-operator 
   for(int i=0; i<buffsz; i++)
   {
+    //we don't care about the newline
     if(*(ct+i) != '\n')
     {
+      //convert space back to ASCII char after Z for calculation
       if(*(ct+i) == 32)
         tmp0 = 91;
       else
         tmp0 = *(ct+i); 
+      //bring value of cypher'd char back down to 0 - 26 
       tmp1 = tmp0 - 65;
+      //makes sense within context of algebraic operation (a + x) mod m = b -> a + 65 + x = nm + b 
       tmp2 = (*(key+i) + 65);
       tmp3 = (tmp1 - tmp2);
+      //necessary given the way that C handles modular arithmetic of negative values
       tmp4 = ceilf( fabs( (tmp3+.0)/27 ) );
       tmp5 = tmp3 + (tmp4*27);
       diffc = tmp5 + 65;
-      if(DEBUG){ fprintf(stderr, "otp_dec_d: in decrypt_buffers tmp1, tmp2, tmp3, tmp4, tmp5, diffc:\
-          %i; %i; %i; %f; %i; %i;", tmp1, tmp2, tmp3, tmp4, tmp5, diffc); }
+      //once again, our friend the space char 
       if(diffc == 91)
         diffc = 32;
       decd[i] = diffc; 
-      if(DEBUG){ fprintf(stderr, "%c\n", diffc); }
     }
   }
   decd[buffsz-1]='\n';
@@ -47,10 +57,21 @@ char* decrypt_buffers(char *ct, char *key, int buffsz)
   return decd;
 }
 
+//global for child counting
+int KIDCOUNT;
 
+/**
+ * Much of this is taken from the server.c code provided
+ */
 int main(int argc, char *argv[])
 {
-	int listenSocketFD, cxfd, portNumber;
+  //ignore all signals but SIGCHLD and SIGINT
+  set_srvr_proc_mask();
+ 
+  //register the SIGCHLD handler
+  reg_chld_handler();
+  
+  int listenSocketFD, cxfd, portNumber;
 	socklen_t sizeOfClientInfo;
 	struct sockaddr_in serverAddress, clientAddress;
 
@@ -81,51 +102,60 @@ int main(int argc, char *argv[])
 	// Accept a connection, blocking if one is not available until one connects
 	sizeOfClientInfo = sizeof(clientAddress);
  
-  //track children
-  Children rugrats = {0};
-  
   while(1) 
   {
-    cxfd = accept(listenSocketFD, (struct sockaddr *)&clientAddress, &sizeOfClientInfo); // Accept
-    if (cxfd < 0) error("ERROR on accept");
+	  //Accept a connection, blocking until one becomes available 
+    if(DEBUG){fprintf(stderr, "%s\n", "otp_dec_d: accept loop.");} 
+    cxfd = accept(listenSocketFD, (struct sockaddr *)&clientAddress, &sizeOfClientInfo); 
+    //should be using a signal for this...
+    while(KIDCOUNT > 4)
+    {  
+      usleep(1250);
+    }
 
-    if(1)
-      fprintf(stderr, "KIDS: %i\n", rugrats.count);
-    
-    if(DEBUG){fprintf(stderr, "%s\n", "otp_enc_d: accept loop.");} 
+    KIDCOUNT++;
+    if(DEBUG){fprintf(stderr, "Incrementing KIDCOUNT. KIDCOUNT==%i\n", KIDCOUNT);}
     pid_t spawn_pid = fork();
     
     switch(spawn_pid)
     { 
       case -1:
         error("Failed to fork.");
+        KIDCOUNT--;
         break; 
       case 0:
       {
+        //child won't need this
+        close(listenSocketFD);
+        if(DEBUG){fprintf(stderr, "otp_dec_d(child): child pid: %i\n", getpid());}
+        
         //setup 
         int bfsz, keybfsz;
         bfsz = keybfsz = INT_MIN;
         char *ptbuff, *keybuff, *cypherbuff;
         keybuff = ptbuff = cypherbuff = NULL;
-        //ensure client is otp_enc
+        
+        //this call sends ready if client is DECC 
         check_client(cxfd, DECC); 
-        //above call sends ready if client is ENCC 
-        //get plaintext
+        
+        //get cyphertext
         bfsz = get_file_len(cxfd);
         cypherbuff = get_clients_file(cxfd, bfsz); 
         if(DEBUG){fprintf(stderr, "otp_dec_d: cyphertext received == %s\n", cypherbuff);}
+        
         //get key
         keybfsz = get_file_len(cxfd);
         keybuff = get_clients_file(cxfd, keybfsz); 
-        //check keysize 
+        
+        //check keysize; this is likely an unnecessary safeguard, given client file validation
         if( keybfsz < bfsz ) error("Key of insufficient size.");
         
-        //encrypt plaintext 
+        //decrypt cyphertext 
         if(DEBUG){fprintf(stderr, "%s", "otp_dec_d: before decrypt\n");}
         if(DEBUG){fprintf(stderr, "otp_dec_d: cypherbuff== %s\n", cypherbuff);}
         if(DEBUG){fprintf(stderr, "otp_dec_d: keybuff== %s\n", keybuff);}
         ptbuff = decrypt_buffers(cypherbuff, keybuff, bfsz);
-        //send cyphertext
+        //send plaintext
         send(cxfd, ptbuff, bfsz, 0);
         
         //cleanup 
@@ -133,16 +163,16 @@ int main(int argc, char *argv[])
         free(keybuff);
         free(cypherbuff);
         ptbuff = keybuff = cypherbuff = NULL;
+        //close child's copies of the socket descriptions
+        close(cxfd);
+        exit(0); 
         break;   
       }
       default:
-        //put the spawn pid in the Children struct and increment
-        rugrats.kids[rugrats.count++] = spawn_pid; 
         //close parent's copy of socket fd
         close(cxfd);
         break;
     } 
-    
   }
   close(listenSocketFD); // Close the listening socket
 	return 0; 

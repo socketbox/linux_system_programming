@@ -1,3 +1,6 @@
+/**
+ * This file contains constants used for client/server communication     
+ */
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
@@ -17,6 +20,7 @@
 #define RDY										200
 #define INVCL									500	
 #define INVCL_STR							"INVCL"	
+//SKTTO never used
 #define SKTTO									590	
 #define SKTTO_STR							"SKTTO"
 #define SRVR_RESP_LEN					6 

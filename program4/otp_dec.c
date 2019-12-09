@@ -13,24 +13,8 @@
 
 
 /**
- * 
- *  
+ * Much of this taken from provided client.c code
  */
-void send_client_type(int cxfd, int type)
-{
-  if(DEBUG){fprintf(stderr, "%s\n", "otp_enc: sending client type");}
-  
-  int sent = INT_MIN; 
-  if(type == ENCC)
-    sent = send(cxfd, ENCC_PAMB_STR, PREAMB_LEN, 0);
-  else if(type == DECC)
-    sent = send(cxfd, DECC_PAMB_STR, PREAMB_LEN, 0);
-
-  if(DEBUG){fprintf(stderr, "otp_enc: bytes sent==%i\n", sent);}
-}
-
-
-
 int main(int argc, char *argv[])
 {
 	int socketFD, portNumber;
@@ -40,6 +24,7 @@ int main(int argc, char *argv[])
   // Check usage & args 
 	if (argc < 4) { fprintf(stderr,"USAGE: %s cyphertext_file key_file port\n", argv[0]); exit(0); } 
 
+  //validate the key and cyphertext files
   int cyptfsz = verify_file(argv[1]);
   int kfsz = verify_file(argv[2]);
   if(kfsz < cyptfsz){ error("Key file of insufficient length"); }
@@ -65,29 +50,31 @@ int main(int argc, char *argv[])
   send_client_type(socketFD, DECC);
   parse_response(socketFD);
 
-  //send cyphertext 
+  //send cyphertext file size
   send_file_size(socketFD, cyptfsz);
   parse_response(socketFD);
   
+  //send cyphertext file
   send_file(socketFD, argv[1], cyptfsz);
   parse_response(socketFD);
   
-  //send key 
+  //send key file size
   send_file_size(socketFD, kfsz);
   parse_response(socketFD);
   
+  //send key 
   send_file(socketFD, argv[2], kfsz);
   parse_response(socketFD);
   
-  //get cyphertext 
+  //get plaintext
   char *decbuff = NULL;
   decbuff = recv_bytes(socketFD, cyptfsz);
   if(DEBUG){fprintf(stderr, "%s", "otp_enc: after recv_bytes\n");}
 
-  //print out encbytes!
+  //print out decbytes!
   fprintf(stdout, "%s", decbuff);
   
-  //we're closing in the parent, so this shouldn't be necessary  
+  //we're closing in the parent, so the call to shutdown shouldn't be necessary  
   shutdown(socketFD, SHUT_WR);
   close(socketFD);
 	return 0;

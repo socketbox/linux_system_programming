@@ -12,20 +12,10 @@
 #include "base.h"
 
 
-void send_client_type(int cxfd, int type)
-{
-  if(DEBUG){fprintf(stderr, "%s\n", "otp_enc: sending client type");}
-  
-  int sent = INT_MIN; 
-  if(type == ENCC)
-    sent = send(cxfd, ENCC_PAMB_STR, PREAMB_LEN, 0);
-  else if(type == DECC)
-    sent = send(cxfd, DECC_PAMB_STR, PREAMB_LEN, 0);
 
-  if(DEBUG){fprintf(stderr, "otp_enc: bytes sent==%i\n", sent);}
-}
-
-
+/**
+ * Much of this taken from provided client.c code
+ */
 int main(int argc, char *argv[])
 {
 	int socketFD, portNumber;
@@ -60,17 +50,19 @@ int main(int argc, char *argv[])
   send_client_type(socketFD, ENCC);
   parse_response(socketFD);
 
-  //send plaintext 
+  //send plaintext file size
   send_file_size(socketFD, ptfsz);
   parse_response(socketFD);
   
+  //send plaintext 
   send_file(socketFD, argv[1], ptfsz);
   parse_response(socketFD);
   
-  //send key 
+  //send key file size
   send_file_size(socketFD, kfsz);
   parse_response(socketFD);
   
+  //send key 
   send_file(socketFD, argv[2], kfsz);
   parse_response(socketFD);
   
@@ -82,7 +74,7 @@ int main(int argc, char *argv[])
   //print out encbytes!
   fprintf(stdout, "%s", encbuff);
   
-  //we're closing in the parent, so this shouldn't be necessary  
+  //we're closing in the parent, so the call to shutdown shouldn't be necessary  
   shutdown(socketFD, SHUT_WR);
   close(socketFD);
 	return 0;
